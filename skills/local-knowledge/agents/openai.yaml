@@ -1,0 +1,3 @@
+interface:
+  display_name: "Local Knowledge"
+  short_description: "Start, stop, and check the offline knowledge service"

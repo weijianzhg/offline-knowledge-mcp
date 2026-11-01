@@ -145,6 +145,8 @@ Dependencies are pinned in `requirements.lock.txt`; reinstall into a Python 3.12
 
 ## Restore from the GitHub backup
 
+The reusable Codex skill is saved in `skills/local-knowledge/` and installed on this machine at `C:\Users\weiji\.codex\skills\local-knowledge`. It handles natural requests such as “start local knowledge,” “stop local knowledge,” and “check local knowledge status.” To restore the skill on another installation, copy its folder into your Codex skills directory and adjust the machine-specific paths in `SKILL.md`.
+
 The private repository backs up source code, scripts, documentation, pinned dependencies, and `source-manifest.json`. It excludes credentials, chats, runtime logs, the virtual environment, and downloaded knowledge data. For a byte-for-byte backup of the installed knowledge snapshot, copy `data/` separately to your backup storage while the importer is idle.
 
 After cloning onto a Windows machine with Python 3.12 x64, run from the project folder:
