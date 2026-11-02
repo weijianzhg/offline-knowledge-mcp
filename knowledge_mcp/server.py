@@ -12,7 +12,7 @@ from .store import DEFAULT_DB, GROUNDING, Store
 
 def create_server(path=DEFAULT_DB):
     store = Store(path)
-    server = MCPServer("Offline Knowledge", version="0.1.0", instructions=GROUNDING)
+    server = MCPServer("Offline Knowledge", version="0.1.1", instructions=GROUNDING)
     annotations = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 
     @server.tool(annotations=annotations, structured_output=True)
@@ -56,15 +56,20 @@ def create_server(path=DEFAULT_DB):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--port", type=int, default=8766)
-    parser.add_argument("--stdio", action="store_true")
+    transport = parser.add_mutually_exclusive_group()
+    transport.add_argument("--transport", choices=("stdio", "streamable-http"), default="streamable-http")
+    transport.add_argument("--stdio", action="store_true", help="Alias for --transport stdio")
     args = parser.parse_args()
-    if not args.db.exists():
+    args.db = args.db.expanduser().resolve()
+    if not args.db.is_file():
         parser.error("Database missing. Run python -m knowledge_mcp.ingest init first.")
+    if not 1 <= args.port <= 65535:
+        parser.error("--port must be between 1 and 65535")
     server = create_server(args.db)
-    if args.stdio:
+    if args.stdio or args.transport == "stdio":
         server.run(transport="stdio")
     else:
         server.run(transport="streamable-http", host="127.0.0.1", port=args.port,

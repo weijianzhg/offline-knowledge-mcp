@@ -15,3 +15,7 @@ logs/
 *.db
 *.zim
 *.part
+
+.DS_Store
+build/
+dist/

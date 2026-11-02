@@ -1,0 +1,42 @@
+name: Cross-platform tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies and package
+        run: |
+          python -m pip install -r requirements.lock.txt
+          python -m pip install --no-deps -e .
+          python -m pip check
+      - name: Test retrieval, native ZIM, stdio and HTTP
+        run: python -m unittest discover -s tests -v
+      - name: Parse optional Windows helpers
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem *.ps1 | ForEach-Object {
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$parseErrors)
+            if ($parseErrors) { throw ($parseErrors | Out-String) }
+          }
+      - name: Exercise documented sample setup
+        run: |
+          python -m knowledge_mcp.ingest init
+          python -m knowledge_mcp.ingest documents examples/documents.jsonl --source examples/source.json
+          python -m knowledge_mcp.ingest facts examples/facts.jsonl --source examples/source.json
+          python -m knowledge_mcp.ingest csv examples/observations.csv --source examples/source.json --dataset-id demo
+          python -m knowledge_mcp.verify --query eclipse
