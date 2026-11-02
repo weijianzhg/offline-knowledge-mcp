@@ -1,0 +1,8 @@
+{
+  "id": "demo",
+  "name": "Synthetic onboarding examples",
+  "source_url": "https://example.org/offline-knowledge-demo",
+  "license": "CC0-1.0 (synthetic examples only)",
+  "scope": "Demonstration documents, invented facts and observations. Not real statistics.",
+  "snapshot_date": "2026-11-02"
+}

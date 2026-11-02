@@ -9,7 +9,7 @@ from contextlib import closing
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from .store import DEFAULT_DB, ROOT, connect, initialize, put_document, put_source, utc_now
+from .store import DEFAULT_DB, connect, initialize, put_document, put_source, utc_now, zim_path
 
 
 def fetch_json(url, destination):
@@ -39,7 +39,7 @@ def register_zim(db_path, path, source_id, expected_sha256=None):
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if expected_sha256 and digest.lower() != expected_sha256.lower():
         raise ValueError("Archive SHA256 does not match supplied publisher checksum")
-    archive = Archive(path)
+    archive = Archive(zim_path(path))
     if not archive.has_checksum or not archive.check():
         raise ValueError("ZIM internal checksum validation failed")
     if not archive.has_fulltext_index:
@@ -67,7 +67,7 @@ def sync_world_bank(db_path, countries, first_year, last_year):
         raise ValueError("Use semicolon-separated ISO3 country codes, or WLD")
     if not 1960 <= first_year <= last_year <= 2100:
         raise ValueError("Invalid year range")
-    batch = ROOT / "data" / "raw" / ("world-bank-" + utc_now().replace(":", "").replace("+", "-"))
+    batch = Path(db_path).resolve().parent / "raw" / ("world-bank-" + utc_now().replace(":", "").replace("+", "-"))
     indicators = {"SP.POP.TOTL": ("population", "people"), "NY.GDP.MKTP.CD": ("gdp_current_usd", "current US dollars")}
     records, definitions, updated = [], {}, []
     for indicator in indicators:
@@ -94,7 +94,7 @@ def sync_world_bank(db_path, countries, first_year, last_year):
                 "license_url": "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets",
                 "scope": f"{countries}; population and GDP (current US$); {first_year}-{last_year}. Null values mean missing observations.",
                 "snapshot_date": snapshot, "publisher_last_updated": sorted({v for v in updated if v}),
-                "raw_files": str(batch.relative_to(ROOT)),
+                "raw_files": str(batch.relative_to(Path(db_path).resolve().parent)),
                 "raw_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in batch.glob('*.json')}}
     initialize(db_path)
     # Fetch everything first, then replace all tables in one transaction.
@@ -187,6 +187,7 @@ def main():
         if kind == "csv":
             cmd.add_argument("--dataset-id", required=True)
     args = parser.parse_args()
+    args.db = args.db.expanduser().resolve()
     if args.command == "init":
         initialize(args.db)
         result = {"database": str(args.db)}
@@ -198,7 +199,7 @@ def main():
         result = import_csv(args.db, args.path, args.source, args.dataset_id)
     else:
         result = import_jsonl(args.db, args.path, args.source, args.command)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 [project]
 name = "offline-knowledge-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local, provenance-aware Wikipedia and statistical retrieval over MCP"
 requires-python = ">=3.12"
 dependencies = ["mcp==2.3.0", "libzim==4.0.0"]
@@ -8,6 +8,7 @@ dependencies = ["mcp==2.3.0", "libzim==4.0.0"]
 [project.scripts]
 knowledge-mcp = "knowledge_mcp.server:main"
 knowledge-import = "knowledge_mcp.ingest:main"
+knowledge-verify = "knowledge_mcp.verify:main"
 
 [build-system]
 requires = ["setuptools>=68"]
