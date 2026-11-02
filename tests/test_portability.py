@@ -10,6 +10,7 @@ import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from mcp import Client, StdioServerParameters
 
@@ -114,6 +115,43 @@ class PortabilityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             asyncio.run(verify(self.path, installed_collection=True))
 
+    def test_verifier_rejects_partial_search_and_tampered_document(self):
+        store = self.store
+
+        class FakeClient:
+            protocol_version = 'test'
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+            async def list_tools(self):
+                return SimpleNamespace(tools=[SimpleNamespace(name=name) for name in TOOLS])
+
+            async def call_tool(self, name, arguments=None):
+                if name == 'list_sources':
+                    content = store.list_sources()
+                elif name == 'search_knowledge':
+                    content = store.search('eclipse')
+                    if mode == 'search_error':
+                        content['source_errors'] = [{'source_id': 'fixture', 'error': 'unavailable'}]
+                    elif mode == 'different_document':
+                        content['results'][0]['document_id'] = 'fixture:other'
+                else:
+                    content = store.read('fixture:eclipse')
+                    content['text'] = ''
+                return SimpleNamespace(is_error=False, structured_content=content)
+
+        for mode in ('search_error', 'different_document', 'tampered_text'):
+            with self.subTest(mode=mode), patch('knowledge_mcp.verify.Client', FakeClient):
+                with self.assertRaises(RuntimeError):
+                    asyncio.run(verify(self.path, query='eclipse'))
+
     def test_missing_database_and_invalid_port_fail_clearly(self):
         result = self.cli('knowledge_mcp.server', '--db', Path(self.temp.name) / 'missing.db', '--stdio')
         self.assertNotEqual(result.returncode, 0)
@@ -159,12 +197,17 @@ class PortabilityTests(unittest.TestCase):
             def get_hints(self):
                 return {Hint.FRONT_ARTICLE: True}
 
-        archive = Path(self.temp.name) / 'sample café.zim'
+        # The upstream Windows Xapian writer requires an ASCII build path.
+        # Our application only reads archives; test Unicode reader paths separately.
+        archive = Path(self.temp.name) / 'sample.zim'
         with Creator(str(archive)).config_indexing(True, 'eng') as creator:
             creator.add_item(Article())
             for name, value in {'Title': 'Synthetic ZIM', 'Description': 'Test only',
                                 'Language': 'eng', 'Date': '2026-01-01'}.items():
                 creator.add_metadata(name, value)
+        unicode_archive = archive.with_name('sample café.zim')
+        archive.rename(unicode_archive)
+        archive = unicode_archive
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         with self.assertRaisesRegex(ValueError, 'SHA256'):
             register_zim(self.path, archive, 'test_zim', '0' * 64)

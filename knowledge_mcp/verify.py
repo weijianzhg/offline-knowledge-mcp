@@ -51,17 +51,27 @@ async def verify(db_path, url=None, query=None, installed_collection=False):
             raise RuntimeError("MCP catalog differs from the selected local database")
         if query:
             result = await client.call_tool("search_knowledge", {"query": query})
-            if result.is_error or not result.structured_content["results"]:
+            if (result.is_error or result.structured_content["status"] != "found"
+                    or result.structured_content["source_errors"] or not result.structured_content["results"]):
                 raise RuntimeError("MCP search failed")
+            remote_id = result.structured_content["results"][0]["document_id"]
+            if remote_id != expected["results"][0]["document_id"]:
+                raise RuntimeError("MCP search differs from local evidence")
             result = await client.call_tool("read_document", {
-                "document_id": expected["results"][0]["document_id"]})
-            if result.is_error or result.structured_content["sha256"] != document["sha256"]:
+                "document_id": remote_id})
+            if (result.is_error or result.structured_content["status"] != "found"
+                    or result.structured_content["sha256"] != document["sha256"]
+                    or result.structured_content["text"] != document["text"]):
                 raise RuntimeError("MCP document differs from local evidence")
         if installed_collection:
             result = await client.call_tool("lookup_fact", {
                 "subject": "JPN", "predicate": "population", "observation_date": "2024"})
             if result.is_error or result.structured_content["results"][0]["value"] != facts[0]["value"]:
                 raise RuntimeError("MCP World Bank check failed")
+            result = await client.call_tool("read_document", {"document_id": article["document_id"]})
+            if (result.is_error or result.structured_content["text"] != article["text"]
+                    or result.structured_content["sha256"] != article["sha256"]):
+                raise RuntimeError("MCP Wikipedia check failed")
         return {"status": "PASS", "checked_at": utc_now(), "transport": "streamable-http" if url else "stdio",
                 "protocol_version": client.protocol_version, "tools": sorted(names),
                 "source_ids": [s["id"] for s in catalog["sources"]],
