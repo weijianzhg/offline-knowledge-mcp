@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import threading
@@ -19,6 +20,24 @@ GROUNDING = (
     "No match means not_in_offline_database, not that the claim is false. "
     "A snapshot cannot establish that information is current."
 )
+
+
+def zim_path(path):
+    """Use a Windows short path for native libraries that reopen UTF-8 paths as ANSI."""
+    value = str(path)
+    if os.name != "nt" or value.isascii():
+        return value
+    import ctypes
+    from ctypes import wintypes
+
+    get_short_path = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+    get_short_path.argtypes = (wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD)
+    get_short_path.restype = wintypes.DWORD
+    buffer = ctypes.create_unicode_buffer(32768)
+    size = get_short_path(value, buffer, len(buffer))
+    if not size or size >= len(buffer) or not buffer.value.isascii():
+        raise ValueError("This Windows libzim build needs an ASCII archive path. Move the ZIM to an ASCII-only directory and filename, then register it again.")
+    return buffer.value
 
 
 def utc_now():
@@ -167,7 +186,7 @@ class Store:
         path = Path(source["archive_path"])
         signature = (str(path), path.stat().st_mtime_ns, path.stat().st_size)
         if source["id"] not in self.archives or self.archives[source["id"]][0] != signature:
-            self.archives[source["id"]] = (signature, Archive(path))
+            self.archives[source["id"]] = (signature, Archive(zim_path(path)))
         return self.archives[source["id"]][1]
 
     def _zim_document(self, source, path):

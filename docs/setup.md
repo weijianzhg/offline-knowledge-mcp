@@ -68,4 +68,5 @@ Windows users can optionally use `Start-KnowledgeMCP.ps1` and `Stop-KnowledgeMCP
 - Missing database: initialize the same absolute `--db` used by the client; a clone contains no database.
 - Empty catalog: import sample or real sources. Initialization alone installs no knowledge.
 - ZIM cannot open after moving machines: re-register the local archive; its stored path is machine-specific.
+- On Windows, native libzim/Xapian has limitations reopening non-ASCII archive paths. The server uses an ASCII Windows short-path alias where available. If short names are disabled, move the archive to an ASCII-only path such as `C:\Knowledge\wikipedia.zim` and re-register it. SQLite databases and imported documents do not need this workaround.
 - GUI cannot find Python: set the absolute `.venv/bin/python` or `.venv\Scripts\python.exe` path in the client.

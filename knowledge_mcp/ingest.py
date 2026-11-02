@@ -9,7 +9,7 @@ from contextlib import closing
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from .store import DEFAULT_DB, connect, initialize, put_document, put_source, utc_now
+from .store import DEFAULT_DB, connect, initialize, put_document, put_source, utc_now, zim_path
 
 
 def fetch_json(url, destination):
@@ -39,7 +39,7 @@ def register_zim(db_path, path, source_id, expected_sha256=None):
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if expected_sha256 and digest.lower() != expected_sha256.lower():
         raise ValueError("Archive SHA256 does not match supplied publisher checksum")
-    archive = Archive(path)
+    archive = Archive(zim_path(path))
     if not archive.has_checksum or not archive.check():
         raise ValueError("ZIM internal checksum validation failed")
     if not archive.has_fulltext_index:
