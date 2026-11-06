@@ -1,4 +1,4 @@
-"""Explicit operator-only imports. Only sync-world-bank uses the internet."""
+"""Explicit operator-only imports. Downloads run only in explicit sync/install commands."""
 import argparse
 import csv
 import hashlib
@@ -7,7 +7,8 @@ import re
 import time
 from contextlib import closing
 from pathlib import Path
-from urllib.request import Request, urlopen
+from .catalog import COLLECTIONS
+from .downloads import download_file
 
 from .store import DEFAULT_DB, connect, initialize, put_document, put_source, utc_now, zim_path
 
@@ -16,23 +17,17 @@ def fetch_json(url, destination):
     # This module is never imported by the serving process.
     for attempt in range(3):
         try:
-            req = Request(url, headers={"User-Agent": "OfflineKnowledgeMCP/0.1 (personal offline data snapshot)",
-                                       "Accept": "application/json"})
-            with urlopen(req, timeout=45) as response:
-                raw = response.read(20_000_001)
-            if len(raw) > 20_000_000:
-                raise ValueError("Response exceeds 20 MB")
-            value = json.loads(raw)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(raw)
-            return value
+            download_file(url, destination, 20_000_000)
+            return json.loads(destination.read_bytes())
         except Exception:
             if attempt == 2:
                 raise
             time.sleep(2 ** attempt)
 
 
-def register_zim(db_path, path, source_id, expected_sha256=None):
+def register_zim(db_path, path, source_id, expected_sha256=None, collection="wikipedia"):
+    from .zim_sources import PROFILES
+    profile = PROFILES[collection]
     from libzim.reader import Archive
     path = Path(path).resolve(strict=True)
     with path.open("rb") as stream:
@@ -45,13 +40,13 @@ def register_zim(db_path, path, source_id, expected_sha256=None):
     if not archive.has_fulltext_index:
         raise ValueError("ZIM must contain a full-text search index")
     if archive.get_metadata("Language").decode() != "eng":
-        raise ValueError("This Wikipedia adapter currently supports English archives only")
+        raise ValueError("These archive adapters currently support English archives only")
     metadata = {"id": source_id, "kind": "zim", "name": archive.get_metadata("Title").decode(),
                 "scope": archive.get_metadata("Description").decode(),
                 "snapshot_date": archive.get_metadata("Date").decode(),
-                "source_url": "https://download.kiwix.org/zim/wikipedia/" + path.name,
-                "license": "Wikipedia text: CC BY-SA; see article attribution/history. Media licenses vary.",
-                "license_url": "https://en.wikipedia.org/wiki/Wikipedia:Copyrights",
+                "source_url": "https://download.kiwix.org/zim/" + collection + "/" + path.name,
+                "collection": collection,
+                "license": profile["license"], "license_url": profile["license_url"],
                 "archive_path": str(path), "archive_sha256": digest,
                 "publisher_checksum_verified": bool(expected_sha256),
                 "archive_article_count": archive.article_count,
@@ -176,10 +171,11 @@ def main():
     zim.add_argument("path", type=Path)
     zim.add_argument("--source-id", required=True)
     zim.add_argument("--sha256")
+    zim.add_argument("--collection", choices=("wikipedia", "wikivoyage", "ifixit", "gutenberg"), default="wikipedia")
     wb = sub.add_parser("sync-world-bank")
-    wb.add_argument("--countries", default="GBR;USA;JPN;CHN;IND;DEU;FRA;CAN;AUS;WLD")
-    wb.add_argument("--first-year", type=int, default=2000)
-    wb.add_argument("--last-year", type=int, default=2025)
+    wb.add_argument("--countries", default=COLLECTIONS["world-bank"]["countries"])
+    wb.add_argument("--first-year", type=int, default=COLLECTIONS["world-bank"]["first_year"])
+    wb.add_argument("--last-year", type=int, default=COLLECTIONS["world-bank"]["last_year"])
     for kind in ("documents", "facts", "csv"):
         cmd = sub.add_parser(kind)
         cmd.add_argument("path", type=Path)
@@ -192,7 +188,7 @@ def main():
         initialize(args.db)
         result = {"database": str(args.db)}
     elif args.command == "register-zim":
-        result = register_zim(args.db, args.path, args.source_id, args.sha256)
+        result = register_zim(args.db, args.path, args.source_id, args.sha256, args.collection)
     elif args.command == "sync-world-bank":
         result = sync_world_bank(args.db, args.countries, args.first_year, args.last_year)
     elif args.command == "csv":

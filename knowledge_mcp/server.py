@@ -23,7 +23,7 @@ def create_server(path=DEFAULT_DB):
     @server.tool(annotations=annotations, structured_output=True)
     def search_knowledge(query: str, source_id: str | None = None, limit: int = 5,
                          max_age_days: int | None = None) -> dict[str, Any]:
-        """Search offline Wikipedia and imported documents using short keywords. Returns excerpts and document IDs. max_age_days flags old snapshots; it does not hide them. Use read_document for evidence and cite source URLs."""
+        """Search installed offline archives and imported documents using short keywords. Filter source_id to focus on a collection. Returns excerpts and document IDs. max_age_days flags old snapshots; it does not hide them. Use read_document for evidence and cite source URLs. For archive hits, pass excerpt_offset as the read offset to read near the match."""
         return store.search(query, source_id, limit, max_age_days)
 
     @server.tool(annotations=annotations, structured_output=True)

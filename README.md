@@ -6,15 +6,51 @@ Retrieval reads local files only. Downloads and imports are separate, explicit o
 
 ## Get started
 
-1. [Install on macOS or Windows](docs/setup.md) and import the small included sample.
+1. [Install on macOS or Windows](docs/setup.md) to create the Python environment.
 2. Connect your client: [Codex](docs/clients/codex.md), [Claude Code](docs/clients/claude-code.md), [Open WebUI](docs/clients/open-webui.md), or [another MCP host](docs/clients/other-clients.md).
-3. [Import real knowledge](docs/data.md), including Kiwix Wikipedia and World Bank snapshots.
+3. Install all or selected collections using the commands below.
 4. [Verify your installation](docs/testing.md).
 
 | Connection | Use |
 |---|---|
 | stdio | Client launches and stops its own server process; recommended for local agents |
 | Streamable HTTP | Run a shared local process at `http://127.0.0.1:8766/mcp`; suitable for local web UIs |
+
+## Install knowledge collections
+
+All five collections use the same installer. From the repository folder in Windows PowerShell:
+
+```powershell
+# See the available collections and download sizes
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections --list
+
+# Install every collection
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections all
+
+# Or install only your selection (one or several names)
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections wikipedia world-bank
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections ifixit wikivoyage gutenberg
+```
+
+On macOS/Linux, replace `.\.venv\Scripts\python.exe` with `.venv/bin/python`. Choose `all` or the names you want; you do not need to run every example.
+
+| Name | Included data | Approximate download |
+|---|---|---|
+| `wikipedia` | English Wikipedia starter selection | 0.33 GB |
+| `world-bank` | Population and nominal GDP, 10 countries/aggregates, 2000–2025 | Small API snapshot |
+| `wikivoyage` | English travel guides with pictures | 1.07 GB |
+| `ifixit` | English repair guides with illustrations | 3.57 GB |
+| `gutenberg` | English general literature, LCC PN selection | 3.25 GB |
+
+Installing everything requires about **8.22 GB** of archives plus the small statistical dataset. Wikipedia and Gutenberg are selected collections, not their full English libraries. The installer downloads, validates and registers the chosen data for lexical search. It reuses verified archives and preserves an existing World Bank snapshot. No embeddings or model training are involved.
+
+To explicitly refresh World Bank using the catalog's country/year selection:
+
+```powershell
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections world-bank --refresh
+```
+
+Use `--db 'C:\Knowledge\knowledge.sqlite3'` for another database. [Installation details, snapshot dates, recovery and verification](docs/data.md) explain data reuse and the lower-level import commands. MCP returns text; original archive illustrations can be viewed with a Kiwix reader.
 
 ## What it exposes
 

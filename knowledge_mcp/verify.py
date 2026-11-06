@@ -14,7 +14,7 @@ from .store import DEFAULT_DB, Store, utc_now
 TOOLS = {"list_sources", "search_knowledge", "read_document", "lookup_fact", "query_data"}
 
 
-async def verify(db_path, url=None, query=None, installed_collection=False):
+async def verify(db_path, url=None, query=None, installed_collection=False, extra_collections=False):
     store = Store(db_path)
     # Event loop creation happens before this patch (Windows uses a socket pair).
     with patch.object(socket.socket, "connect", side_effect=AssertionError("Outbound network forbidden")):
@@ -37,6 +37,25 @@ async def verify(db_path, url=None, query=None, installed_collection=False):
             rows = store.query_data("world_bank", {"country_code": "JPN", "indicator": "SP.POP.TOTL", "year": 2024})
             if not facts or not rows["rows"] or facts[0]["value"] != rows["rows"][0]["value"]:
                 raise RuntimeError("World Bank fact/table mismatch")
+
+    collection_checks = []
+    if extra_collections:
+        with patch.object(socket.socket, "connect", side_effect=AssertionError("Outbound network forbidden")):
+            for source_id, collection_query, prefix in [
+                ("wikivoyage_en", "London", "https://en.wikivoyage.org/wiki/"),
+                ("ifixit_en", "battery replacement", "https://www.ifixit.com/"),
+                ("gutenberg_en_literature", "poetry", "https://www.gutenberg.org/ebooks/"),
+            ]:
+                hits = store.search(collection_query, source_id=source_id)
+                if hits["source_errors"] or not hits["results"]:
+                    raise RuntimeError(f"Collection search failed: {source_id}")
+                hit = hits["results"][0]
+                doc = store.read(hit["document_id"], offset=hit["excerpt_offset"])
+                if (not doc["text"].strip() or not doc["citation_url"].startswith(prefix)
+                        or doc["source"]["id"] != source_id
+                        or collection_query.split()[0].lower() not in doc["text"].lower()):
+                    raise RuntimeError(f"Collection evidence/citation failed: {source_id}")
+                collection_checks.append((source_id, collection_query, hit, doc))
 
     target = url or StdioServerParameters(
         command=sys.executable,
@@ -72,11 +91,30 @@ async def verify(db_path, url=None, query=None, installed_collection=False):
             if (result.is_error or result.structured_content["text"] != article["text"]
                     or result.structured_content["sha256"] != article["sha256"]):
                 raise RuntimeError("MCP Wikipedia check failed")
+        for source_id, collection_query, hit, doc in collection_checks:
+            response = await client.call_tool("search_knowledge", {"query": collection_query, "source_id": source_id})
+            if (response.is_error or response.structured_content["source_errors"]
+                    or not response.structured_content["results"]
+                    or response.structured_content["results"][0]["document_id"] != hit["document_id"]):
+                raise RuntimeError(f"MCP collection search failed: {source_id}")
+            response = await client.call_tool("read_document", {
+                "document_id": hit["document_id"], "offset": hit["excerpt_offset"]})
+            if response.is_error or response.structured_content != doc:
+                raise RuntimeError(f"MCP collection evidence differs: {source_id}")
+            if doc["next_offset"] is not None:
+                expected_page = store.read(hit["document_id"], offset=doc["next_offset"])
+                response = await client.call_tool("read_document", {
+                    "document_id": hit["document_id"], "offset": doc["next_offset"]})
+                if response.is_error or response.structured_content != expected_page:
+                    raise RuntimeError(f"MCP collection pagination differs: {source_id}")
         return {"status": "PASS", "checked_at": utc_now(), "transport": "streamable-http" if url else "stdio",
                 "protocol_version": client.protocol_version, "tools": sorted(names),
                 "source_ids": [s["id"] for s in catalog["sources"]],
                 "outbound_socket_blocked_during_local_retrieval": True,
-                "search_checked": query, "installed_collection_checked": installed_collection}
+                "search_checked": query, "installed_collection_checked": installed_collection,
+                "extra_collections": [{"source_id": sid, "query": q, "title": doc["title"],
+                                       "citation_url": doc["citation_url"], "sha256": doc["sha256"]}
+                                      for sid, q, hit, doc in collection_checks]}
 
 
 def main():
@@ -85,12 +123,13 @@ def main():
     parser.add_argument("--url", help="Probe an already running HTTP server instead of launching stdio")
     parser.add_argument("--query", help="Require a matching local document and verify it over MCP")
     parser.add_argument("--installed-collection", action="store_true", help="Also require the starter Wikipedia and World Bank sources")
+    parser.add_argument("--extra-collections", action="store_true", help="Require Wikivoyage, iFixit and Gutenberg search/read/citations")
     parser.add_argument("--output", type=Path, help="Optional JSON report path")
     args = parser.parse_args()
     db_path = args.db.expanduser().resolve()
     if not db_path.is_file():
         parser.error("Database missing; initialize and import data first")
-    report = asyncio.run(verify(db_path, args.url, args.query, args.installed_collection))
+    report = asyncio.run(verify(db_path, args.url, args.query, args.installed_collection, args.extra_collections))
     serialized = json.dumps(report, indent=2)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
