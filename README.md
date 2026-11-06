@@ -65,3 +65,12 @@ The installer creates two command launchers in `%USERPROFILE%\.local\bin` and ad
 The server uses this checkout's `.venv` and `data/knowledge.sqlite3`, listens at `http://127.0.0.1:8766/mcp`, and writes logs under `logs/`. You can close PowerShell after starting it. Run `knowledge-start` again after reboot; automatic startup is not installed. Starting an already-running instance is safe. Stopping it leaves the data and other applications intact.
 
 If Windows Terminal keeps an old PATH, close all its windows and reopen it. Re-run the installer after moving the checkout, after recreating its virtual environment. To uninstall the commands, delete `knowledge-start.cmd` and `knowledge-stop.cmd` from the installation directory; retain the directory's PATH entry if other commands use it. For a custom command directory, pass `-InstallDirectory 'C:\Your\Bin'`; `-SkipPathUpdate` writes the launchers without changing PATH.
+## Add offline repair, travel and books
+
+Install English **iFixit**, **Wikivoyage**, and **Project Gutenberg's general-literature collection** using the existing full-text search backend:
+
+```powershell
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections all
+```
+
+This downloads about 7.9 GB, verifies checksums and registers the archives locally. On macOS/Linux use `.venv/bin/python`. See [collection scope, installation, verification and example questions](docs/data.md#offline-repair-travel-and-literature-collections). Gutenberg is a selected subject collection; images remain available in the original archives while MCP retrieval returns text.

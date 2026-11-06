@@ -12,6 +12,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote, unquote
 
+from .zim_sources import citation_url
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "data" / "knowledge.sqlite3"
 GROUNDING = (
@@ -200,7 +202,8 @@ class Store:
         body = plain_text(bytes(item.content).decode("utf-8", errors="replace"))
         title_path = path[2:] if path.startswith("A/") else path
         return {"document_id": f"zim:{source['id']}:{quote(path, safe='')}", "title": entry.title,
-                "text": body, "citation_url": "https://en.wikipedia.org/wiki/" + quote(unquote(title_path), safe="_()/"),
+                "text": body, "citation_url": citation_url(source.get("collection", "wikipedia"), title_path),
+                "archive_entry": path,
                 "sha256": hashlib.sha256(body.encode()).hexdigest(), "source": evidence_source(source)}
 
     def search(self, query, source_id=None, limit=5, max_age_days=None):
@@ -231,7 +234,7 @@ class Store:
                     continue
                 seen.add(row["document_id"])
                 citation = db.execute("SELECT citation_url FROM documents WHERE id=?", (row["document_id"],)).fetchone()[0]
-                results.append({**dict(row), "citation_url": citation,
+                results.append({**dict(row), "_rank": len(results), "citation_url": citation,
                                 "source": evidence_source(sources[row["source_id"]], max_age_days)})
                 if len(results) >= limit:
                     break
@@ -244,16 +247,20 @@ class Store:
                     archive = self._archive(source)
                     search = Searcher(archive).search(Query().set_query(" ".join(tokens)))
                     paths = list(search.get_results(0, limit))
-                    for result in paths:
+                    for rank, result in enumerate(paths):
                         doc = self._zim_document(source, result.path)
                         # Excerpt is only a preview. read_document supplies bounded evidence pages.
                         body = doc.pop("text")
                         position = next((m.start() for m in re.finditer(re.escape(tokens[0]), body, re.I)), 0)
-                        doc["excerpt"] = body[max(0, position - 150):position + 950]
+                        doc["excerpt_offset"] = max(0, position - 150)
+                        doc["excerpt"] = body[doc["excerpt_offset"]:position + 950]
+                        doc["_rank"] = rank
                         doc["source"] = evidence_source(source, max_age_days)
                         results.append(doc)
             except Exception as exc:
                 errors.append({"source_id": source["id"], "error": type(exc).__name__, "message": str(exc)[:200]})
+        # Interleave backend ranks; scores from independent indexes are not comparable.
+        results.sort(key=lambda item: item.pop("_rank"))
         return {"status": "found" if results else "source_error" if errors else "not_in_offline_database",
                 "results": results[:limit], "source_errors": errors, "guidance": GROUNDING}
 

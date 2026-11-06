@@ -1,4 +1,4 @@
-"""Explicit operator-only imports. Only sync-world-bank uses the internet."""
+"""Explicit operator-only imports. Downloads run only in explicit sync/install commands."""
 import argparse
 import csv
 import hashlib
@@ -32,7 +32,9 @@ def fetch_json(url, destination):
             time.sleep(2 ** attempt)
 
 
-def register_zim(db_path, path, source_id, expected_sha256=None):
+def register_zim(db_path, path, source_id, expected_sha256=None, collection="wikipedia"):
+    from .zim_sources import PROFILES
+    profile = PROFILES[collection]
     from libzim.reader import Archive
     path = Path(path).resolve(strict=True)
     with path.open("rb") as stream:
@@ -45,13 +47,13 @@ def register_zim(db_path, path, source_id, expected_sha256=None):
     if not archive.has_fulltext_index:
         raise ValueError("ZIM must contain a full-text search index")
     if archive.get_metadata("Language").decode() != "eng":
-        raise ValueError("This Wikipedia adapter currently supports English archives only")
+        raise ValueError("These archive adapters currently support English archives only")
     metadata = {"id": source_id, "kind": "zim", "name": archive.get_metadata("Title").decode(),
                 "scope": archive.get_metadata("Description").decode(),
                 "snapshot_date": archive.get_metadata("Date").decode(),
-                "source_url": "https://download.kiwix.org/zim/wikipedia/" + path.name,
-                "license": "Wikipedia text: CC BY-SA; see article attribution/history. Media licenses vary.",
-                "license_url": "https://en.wikipedia.org/wiki/Wikipedia:Copyrights",
+                "source_url": "https://download.kiwix.org/zim/" + collection + "/" + path.name,
+                "collection": collection,
+                "license": profile["license"], "license_url": profile["license_url"],
                 "archive_path": str(path), "archive_sha256": digest,
                 "publisher_checksum_verified": bool(expected_sha256),
                 "archive_article_count": archive.article_count,
@@ -176,6 +178,7 @@ def main():
     zim.add_argument("path", type=Path)
     zim.add_argument("--source-id", required=True)
     zim.add_argument("--sha256")
+    zim.add_argument("--collection", choices=("wikipedia", "wikivoyage", "ifixit", "gutenberg"), default="wikipedia")
     wb = sub.add_parser("sync-world-bank")
     wb.add_argument("--countries", default="GBR;USA;JPN;CHN;IND;DEU;FRA;CAN;AUS;WLD")
     wb.add_argument("--first-year", type=int, default=2000)
@@ -192,7 +195,7 @@ def main():
         initialize(args.db)
         result = {"database": str(args.db)}
     elif args.command == "register-zim":
-        result = register_zim(args.db, args.path, args.source_id, args.sha256)
+        result = register_zim(args.db, args.path, args.source_id, args.sha256, args.collection)
     elif args.command == "sync-world-bank":
         result = sync_world_bank(args.db, args.countries, args.first_year, args.last_year)
     elif args.command == "csv":

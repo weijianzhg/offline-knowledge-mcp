@@ -62,3 +62,48 @@ python -m knowledge_mcp.ingest csv my-data.csv --source my-source.json --dataset
 Document JSONL requires `id`, `title`, `text`, `citation_url`. Fact JSONL requires `id`, `subject`, `predicate`, `value`, `citation_url`; optional keys: `unit`, `observation_date`, `qualifiers`. UTF-8 and UTF-8 with BOM are accepted. CSV headers must be unique simple identifiers. See [examples](../examples/) for complete files.
 
 JSONL imports upsert IDs; omitted records remain. CSV imports replace the dataset. For immutable snapshots, use new source IDs (and dataset IDs for CSV). Back up the database, associated archives and raw snapshots while importers are idle, using SQLite's backup tooling or stopping all processes before copying the database and any WAL files. Git is a source backup, not a knowledge-data backup.
+
+## Offline repair, travel and literature collections
+
+Install the three pinned English Kiwix archives (about **7.9 GB / 7.35 GiB** total):
+
+```powershell
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections all
+```
+
+On macOS/Linux use `.venv/bin/python` instead. For an external database, add `--db /absolute/path/knowledge.sqlite3` before `all`. To install just one collection, replace `all` with `wikivoyage`, `ifixit`, or `gutenberg`.
+
+| Source ID | Included snapshot | Archive date | Download |
+|---|---|---|---|
+| `wikivoyage_en` | English Wikivoyage, including pictures | 2026-09-13 | 1.07 GB |
+| `ifixit_en` | English iFixit archive, including repair illustrations | 2025-12-21 | 3.57 GB |
+| `gutenberg_en_literature` | Project Gutenberg, LCC PN: Literature (General) | 2026-03-06 | 3.25 GB |
+
+Gutenberg is a **selected subject collection**, not the entire English library. Archives can contain redirects and navigation pages; catalog entry counts are not unique book or guide counts. A snapshot's date does not establish that every page was updated on that date. Travel listings can change; older literature is historical source material.
+
+Downloads go into `archives/` beside the database. The installer checks the pinned publisher file size and SHA-256 from Kiwix's `.meta4` files, then verifies the ZIM internal checksum, English language and full-text index before registering it in SQLite. The built-in lexical indexes are reused directly; no embeddings, model training, database migration or new dependencies are needed. Existing Wikipedia and World Bank sources remain available. Registration is atomic **per collection**; if a later collection fails, earlier successful registrations remain. Re-running reuses verified archives. An interrupted download stays as `.part`; a complete valid staged file is reused, while an incomplete file is downloaded again. A corrupt complete file causes an explicit failure; move it aside before retrying.
+
+Pinned filenames, sizes and hashes live in `knowledge_mcp/collections.py`. The source catalog records publisher links, licensing, snapshot dates and archive hashes. Downloads are excluded from Git. If a pinned archive disappears from Kiwix, deliberately update its filename, size and publisher hash together; do not substitute another archive under the old checksum.
+
+Restart a running HTTP service after updating its code:
+
+```powershell
+knowledge-stop
+knowledge-start
+.\.venv\Scripts\python.exe -m knowledge_mcp.verify --url http://127.0.0.1:8766/mcp --extra-collections --output logs/extra-collections-http.json
+.\.venv\Scripts\python.exe -m knowledge_mcp.verify --extra-collections --output logs/extra-collections-stdio.json
+```
+
+The first probe checks the shared server; the second launches a temporary stdio process. Both require real search matches, correct publisher citations, matching text/hashes and pagination. Local evidence checks block outbound Python sockets. These checks verify MCP retrieval, not a guarantee that every LLM will select or interpret the tools correctly.
+
+Ask your connected model:
+
+- “Search `wikivoyage_en` for London and read the result. Explain the City of London and cite its snapshot.”
+- “Search `ifixit_en` for battery adhesive strips, read the guide and identify the compatible devices and required tools.”
+- “Search `gutenberg_en_literature` for poetry, read a matching book and cite its title and author.”
+
+Use `source_id` to focus searches. Unfiltered results interleave independent backend ranks so the first archive cannot fill every result slot; this is a simple fairness rule, not a global relevance score. Archive hits include `excerpt_offset`, which can be passed as `read_document.offset` to read near the match. `archive_entry` identifies the original page inside the ZIM.
+
+The MCP tools return **text only**. Pictures and formatting remain in the ZIM and can be viewed offline using a [Kiwix reader](https://get.kiwix.org/); the publisher citation links themselves require internet. Read illustrated repair procedures in the original archive when the pictures matter. A Kiwix reader is separate from this MCP installation.
+
+Publisher terms: [Wikivoyage CC BY-SA](https://en.wikivoyage.org/wiki/Wikivoyage:Copyleft), [iFixit CC BY-NC-SA 3.0](https://www.ifixit.com/Info/Licensing), and [Project Gutenberg's per-book and jurisdiction-dependent terms](https://www.gutenberg.org/policy/license.html). Original attribution and notices remain in the archives; this repository does not redistribute their contents.
