@@ -1,0 +1,50 @@
+{
+  "wikipedia": {
+    "kind": "zim",
+    "description": "Wikipedia starter collection (not full English Wikipedia)",
+    "source_id": "wikipedia_en_100",
+    "filename": "wikipedia_en_100_2026-08.zim",
+    "size": 333429922,
+    "sha256": "2eb7fd115bfb8644a08a9482f01f52b507428b1b8a30129fead92f7b6715440b",
+    "url": "https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_2026-08.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_2026-08.zim.meta4"
+  },
+  "world-bank": {
+    "kind": "world-bank",
+    "description": "Population and nominal GDP, selected countries, 2000-2025",
+    "source_id": "world_bank",
+    "countries": "GBR;USA;JPN;CHN;IND;DEU;FRA;CAN;AUS;WLD",
+    "first_year": 2000,
+    "last_year": 2025
+  },
+  "wikivoyage": {
+    "kind": "zim",
+    "description": "English travel guide with pictures",
+    "filename": "wikivoyage_en_all_maxi_2026-09.zim",
+    "source_id": "wikivoyage_en",
+    "size": 1071168673,
+    "sha256": "ebaf235b4f95aa7f8666e0a613578577569eb6c81562ebcf397a7ba52173c848",
+    "url": "https://download.kiwix.org/zim/wikivoyage/wikivoyage_en_all_maxi_2026-09.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/wikivoyage/wikivoyage_en_all_maxi_2026-09.zim.meta4"
+  },
+  "ifixit": {
+    "kind": "zim",
+    "description": "English repair guides with illustrations",
+    "filename": "ifixit_en_all_2025-12.zim",
+    "source_id": "ifixit_en",
+    "size": 3570695757,
+    "sha256": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
+    "url": "https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4"
+  },
+  "gutenberg": {
+    "kind": "zim",
+    "description": "English general literature (LCC PN selection)",
+    "filename": "gutenberg_en_lcc-pn_2026-03.zim",
+    "source_id": "gutenberg_en_literature",
+    "size": 3248473917,
+    "sha256": "1e1bd1fdf7464fb31f026e7a02e2bfbc77427802a2cbd7acb7402c09a046be19",
+    "url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim.meta4"
+  }
+}

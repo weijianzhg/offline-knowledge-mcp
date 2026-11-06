@@ -1,74 +1,58 @@
-"""Pinned Kiwix snapshots. Network access is confined to the install command."""
+"""Install all or selected offline collections through one operator command."""
 import argparse
-import hashlib
 import json
 from pathlib import Path
-from urllib.request import Request, urlopen
 
-from .store import DEFAULT_DB
-
-COLLECTIONS = {
-    "wikivoyage": {
-        "filename": "wikivoyage_en_all_maxi_2026-09.zim",
-        "source_id": "wikivoyage_en", "size": 1071168673,
-        "sha256": "ebaf235b4f95aa7f8666e0a613578577569eb6c81562ebcf397a7ba52173c848",
-    },
-    "ifixit": {
-        "filename": "ifixit_en_all_2025-12.zim",
-        "source_id": "ifixit_en", "size": 3570695757,
-        "sha256": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
-    },
-    "gutenberg": {
-        "filename": "gutenberg_en_lcc-pn_2026-03.zim",
-        "source_id": "gutenberg_en_literature", "size": 3248473917,
-        "sha256": "1e1bd1fdf7464fb31f026e7a02e2bfbc77427802a2cbd7acb7402c09a046be19",
-    },
-}
+from .catalog import COLLECTIONS, select_collections
+from .downloads import download_file
+from .store import DEFAULT_DB, Store
 
 
-def validate_download(path, spec):
-    if path.stat().st_size != spec["size"]:
-        raise ValueError("Archive size differs from the pinned publisher metadata")
-    with path.open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    if digest != spec["sha256"]:
-        raise ValueError("Archive SHA256 differs from the pinned publisher checksum")
-
-
-def install_collection(name, db_path=DEFAULT_DB):
-    from .ingest import register_zim
+def install_collection(name, db_path=DEFAULT_DB, *, refresh=False):
+    from .ingest import register_zim, sync_world_bank
     spec = COLLECTIONS[name]
-    directory = Path(db_path).resolve().parent / "archives"
-    directory.mkdir(parents=True, exist_ok=True)
-    target = directory / spec["filename"]
-    if not target.exists():
-        partial = target.with_suffix(target.suffix + ".part")
-        # Reuse a complete staged download only after verifying both size and SHA256.
-        if partial.exists() and partial.stat().st_size == spec["size"]:
-            validate_download(partial, spec)
-        else:
-            url = "https://download.kiwix.org/zim/" + name + "/" + spec["filename"]
-            request = Request(url, headers={"User-Agent": "OfflineKnowledgeMCP/0.1"})
-            with urlopen(request, timeout=60) as response, partial.open("wb") as out:
-                count = 0
-                while block := response.read(1024 * 1024):
-                    count += len(block)
-                    if count > spec["size"]:
-                        raise ValueError("Download exceeds the pinned archive size")
-                    out.write(block)
-            validate_download(partial, spec)
-        partial.replace(target)
-    validate_download(target, spec)
-    return register_zim(db_path, target, spec["source_id"], spec["sha256"], collection=name)
+    db_path = Path(db_path).expanduser().resolve()
+    if spec["kind"] == "world-bank":
+        if db_path.exists() and not refresh:
+            store = Store(db_path)
+            catalog = store.list_sources()
+            has_table = any(d["id"] == "world_bank" and d["source_id"] == spec["source_id"]
+                            for d in catalog["datasets"])
+            if has_table and store.query_data("world_bank", limit=1)["rows"]:
+                for source in catalog["sources"]:
+                    if source["id"] == spec["source_id"]:
+                        return {"status": "reused", "collection": name, "source": source}
+        result = sync_world_bank(db_path, spec["countries"], spec["first_year"], spec["last_year"])
+        return {"status": "installed", "collection": name, **result}
+    if spec["kind"] != "zim":
+        raise ValueError("Unsupported collection kind: " + spec["kind"])
+    target = db_path.parent / "archives" / spec["filename"]
+    archive = download_file(spec["url"], target, spec["size"], size=spec["size"], sha256=spec["sha256"])
+    source = register_zim(db_path, archive, spec["source_id"], spec["sha256"], collection=name)
+    return {"status": "installed", "collection": name, "source": source}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("names", nargs="*", metavar="COLLECTION")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
-    parser.add_argument("collection", choices=[*COLLECTIONS, "all"])
+    parser.add_argument("--list", action="store_true", help="List collection names and sizes without downloading")
+    parser.add_argument("--refresh", action="store_true", help="Refresh selected World Bank data using catalog defaults; pinned ZIMs are reused")
     args = parser.parse_args()
-    for name in COLLECTIONS if args.collection == "all" else [args.collection]:
-        print(json.dumps(install_collection(name, args.db), indent=2), flush=True)
+    if args.list:
+        if args.names or args.refresh:
+            parser.error("Use --list without collection names or --refresh")
+        for name, spec in COLLECTIONS.items():
+            size = f"{spec['size'] / 1e9:.2f} GB" if "size" in spec else "small API snapshot"
+            print(f"{name:12} {size:18} {spec['description']}")
+        return
+    try:
+        selected = select_collections(args.names)
+    except ValueError as exc:
+        parser.error(str(exc))
+    for name in selected:
+        print(f"Installing {name}...", flush=True)
+        print(json.dumps(install_collection(name, args.db, refresh=args.refresh), indent=2), flush=True)
 
 
 if __name__ == "__main__":

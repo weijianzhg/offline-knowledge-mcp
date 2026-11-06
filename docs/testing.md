@@ -34,7 +34,7 @@ Codex CLI registration syntax is checked using isolated configuration, without c
 
 On Windows with Python 3.12 x64, downloaded the pinned Wikivoyage, iFixit and Gutenberg LCC PN archives (7,890,338,347 bytes total). Publisher SHA-256, expected file size, ZIM internal integrity and full-text indexes passed. Catalog counts were 68,182, 103,480 and 1,372 archive entries respectively; these include navigation/redirect entries and are not unique-work counts.
 
-All 27 automated tests passed, including synthetic native ZIMs for all four publishers, source-specific citations, late-document offsets, mixed-source result interleaving, download corruption rejection, reinstallation and preservation of existing data after a failed import. Test downloads use fixtures; CI does not download multi-gigabyte collections.
+All 33 automated tests passed, including synthetic native ZIMs for all four publishers, source-specific citations, late-document offsets, mixed-source result interleaving, download corruption rejection, reinstallation and preservation of existing data after a failed import. Test downloads use fixtures; CI does not download multi-gigabyte collections.
 
 Real stdio and localhost HTTP verification passed for search, read, publisher citations and pagination on all three new collections, plus the original Wikipedia/World Bank checks. Local retrieval was checked with outbound Python socket connections blocked. Reports are saved locally in ignored `logs/collections-stdio.json` and `logs/collections-http.json`.
 
@@ -47,3 +47,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-ExtraCollectionsG
 ```
 
 This optional diagnostic uses an existing DPAPI credential and the shared tool selection, creates three test chats, runs inference, and saves `logs/extra-collections-grounding.json`. It requires the pinned snapshots; expected answer details can change when those snapshots change. It does not change WebUI tool registrations or model defaults.
+
+The unified installer refactor additionally verifies selection validation/deduplication, list-only behavior, World Bank first install/reuse/explicit refresh, incomplete-registration recovery, and shared downloader failure preservation. A built wheel was imported outside the checkout to confirm the five-collection catalog is packaged correctly. Installing all five already-present collections was exercised with outbound sockets blocked.

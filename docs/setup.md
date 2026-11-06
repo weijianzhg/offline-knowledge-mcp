@@ -15,10 +15,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock.txt
 .venv/bin/python -m pip install --no-deps -e .
 .venv/bin/python -m knowledge_mcp.ingest init
-.venv/bin/python -m knowledge_mcp.ingest documents examples/documents.jsonl --source examples/source.json
-.venv/bin/python -m knowledge_mcp.ingest facts examples/facts.jsonl --source examples/source.json
-.venv/bin/python -m knowledge_mcp.ingest csv examples/observations.csv --source examples/source.json --dataset-id demo
-.venv/bin/python -m knowledge_mcp.verify --query eclipse
+.venv/bin/python -m knowledge_mcp.verify
 ```
 
 ## Windows (PowerShell)
@@ -32,13 +29,10 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
 .\.venv\Scripts\python.exe -m pip install --no-deps -e .
 .\.venv\Scripts\python.exe -m knowledge_mcp.ingest init
-.\.venv\Scripts\python.exe -m knowledge_mcp.ingest documents examples/documents.jsonl --source examples/source.json
-.\.venv\Scripts\python.exe -m knowledge_mcp.ingest facts examples/facts.jsonl --source examples/source.json
-.\.venv\Scripts\python.exe -m knowledge_mcp.ingest csv examples/observations.csv --source examples/source.json --dataset-id demo
-.\.venv\Scripts\python.exe -m knowledge_mcp.verify --query eclipse
+.\.venv\Scripts\python.exe -m knowledge_mcp.verify
 ```
 
-The included `demo` source is synthetic test data, not Wikipedia or World Bank observations. Verification launches a real stdio server, discovers the five tools, and searches/reads the sample. It exits when finished. [Add real data](data.md) when ready.
+The software is now installed with an empty database. This verification checks tool discovery, not content. Next, use the [unified collection installer](../README.md#install-knowledge-collections) to install all collections or a selection. The optional `examples/` directory contains synthetic onboarding data; use the [custom import commands](data.md#advanced-imports) to load it. Keep synthetic and real evidence separate when appropriate.
 
 ## Database location and launch
 

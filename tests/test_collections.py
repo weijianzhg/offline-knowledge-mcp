@@ -69,13 +69,13 @@ class CollectionTests(unittest.TestCase):
         with self.assertRaises(ValueError): citation_url('gutenberg', 'index.html')
 
     def spec(self, data):
-        return {'filename': 'fixture.zim', 'source_id': 'fixture', 'size': len(data),
+        return {'kind': 'zim', 'url': 'https://example.org/fixture.zim', 'filename': 'fixture.zim', 'source_id': 'fixture', 'size': len(data),
                 'sha256': hashlib.sha256(data).hexdigest()}
 
     def test_install_download_and_reuse(self):
         data = b'fake archive for downloader only'
         with patch('knowledge_mcp.collections.COLLECTIONS', {'wikivoyage': self.spec(data)}), \
-             patch('knowledge_mcp.collections.urlopen', return_value=io.BytesIO(data)) as fetch, \
+             patch('knowledge_mcp.downloads.urlopen', return_value=io.BytesIO(data)) as fetch, \
              patch('knowledge_mcp.ingest.register_zim', return_value={'id': 'fixture'}) as register:
             install_collection('wikivoyage', self.db)
             install_collection('wikivoyage', self.db)
@@ -87,7 +87,7 @@ class CollectionTests(unittest.TestCase):
         for data in [b'bad', b'wrong!', b'too long for expected']:
             with self.subTest(data=data), \
                  patch('knowledge_mcp.collections.COLLECTIONS', {'wikivoyage': self.spec(b'valid!')}), \
-                 patch('knowledge_mcp.collections.urlopen', return_value=io.BytesIO(data)), \
+                 patch('knowledge_mcp.downloads.urlopen', return_value=io.BytesIO(data)), \
                  patch('knowledge_mcp.ingest.register_zim') as register:
                 partial = self.root / 'archives/fixture.zim.part'
                 partial.unlink(missing_ok=True)
@@ -108,9 +108,83 @@ class CollectionTests(unittest.TestCase):
         target.parent.mkdir()
         target.write_bytes(b'broken')
         with patch('knowledge_mcp.collections.COLLECTIONS', {'wikivoyage': self.spec(b'valid!')}), \
-             patch('knowledge_mcp.collections.urlopen') as fetch, \
+             patch('knowledge_mcp.downloads.urlopen') as fetch, \
              patch('knowledge_mcp.ingest.register_zim') as register:
             with self.assertRaises(ValueError): install_collection('wikivoyage', self.db)
             fetch.assert_not_called()
             register.assert_not_called()
             self.assertEqual(target.read_bytes(), b'broken')
+class UnifiedInstallerTests(unittest.TestCase):
+    def test_selection_validation_and_deduplication(self):
+        from knowledge_mcp.catalog import COLLECTIONS, select_collections
+        self.assertEqual(select_collections(['all']), list(COLLECTIONS))
+        self.assertEqual(select_collections(['ifixit', 'wikipedia', 'ifixit']), ['ifixit', 'wikipedia'])
+        for names in ([], ['all', 'ifixit'], ['not-a-collection']):
+            with self.assertRaises(ValueError): select_collections(names)
+
+    def test_cli_list_and_invalid_selection_do_not_install(self):
+        from contextlib import redirect_stdout, redirect_stderr
+        from knowledge_mcp.collections import main
+        with patch('knowledge_mcp.collections.install_collection') as install:
+            for arguments in (['--list'], ['invalid'], ['all', 'ifixit'], []):
+                with patch('sys.argv', ['collections', *arguments]), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                    if arguments == ['--list']: main()
+                    else:
+                        with self.assertRaises(SystemExit) as error: main()
+                        self.assertEqual(error.exception.code, 2)
+            install.assert_not_called()
+
+    def test_cli_installs_only_selected_collections(self):
+        from contextlib import redirect_stdout
+        from knowledge_mcp.collections import main
+        with patch('sys.argv', ['collections', 'ifixit', 'gutenberg', 'ifixit']), \
+             patch('knowledge_mcp.collections.install_collection', return_value={}) as install, \
+             redirect_stdout(io.StringIO()):
+            main()
+            self.assertEqual([call.args[0] for call in install.call_args_list], ['ifixit', 'gutenberg'])
+
+    def test_world_bank_first_install_reuse_and_explicit_refresh(self):
+        from knowledge_mcp.store import initialize, connect, put_source
+        from contextlib import closing
+        from knowledge_mcp.catalog import COLLECTIONS
+        with tempfile.TemporaryDirectory() as temp:
+            db_path = Path(temp) / 'knowledge.sqlite3'
+            with patch('knowledge_mcp.ingest.sync_world_bank', return_value={'source': {'id': 'world_bank'}}) as sync:
+                result = install_collection('world-bank', db_path)
+                self.assertEqual(result['status'], 'installed')
+                spec = COLLECTIONS['world-bank']
+                sync.assert_called_once_with(db_path, spec['countries'], spec['first_year'], spec['last_year'])
+            initialize(db_path)
+            with closing(connect(db_path, True)) as db, db:
+                put_source(db, {'id': 'world_bank', 'name': 'Custom selection', 'source_url': 'https://data.worldbank.org/', 'license': 'test', 'scope': 'Custom countries'})
+            with patch('knowledge_mcp.ingest.sync_world_bank', return_value={'source': {'id': 'world_bank'}}) as sync:
+                # A source record without its data table is incomplete, so repair it.
+                install_collection('world-bank', db_path)
+                sync.assert_called_once()
+            with closing(connect(db_path, True)) as db, db:
+                db.execute("INSERT INTO datasets VALUES(?,?,?,?)", ('world_bank', 'world_bank', 'Custom selection', '["year"]'))
+                db.execute("INSERT INTO dataset_rows VALUES(?,?,?)", ('world_bank', 1, '{"year": 2024}'))
+            with patch('knowledge_mcp.ingest.sync_world_bank', return_value={'source': {'id': 'world_bank'}}) as sync:
+                result = install_collection('world-bank', db_path)
+                self.assertEqual(result['status'], 'reused')
+                self.assertEqual(result['source']['scope'], 'Custom countries')
+                sync.assert_not_called()
+                install_collection('world-bank', db_path, refresh=True)
+                sync.assert_called_once()
+
+    def test_world_bank_uses_shared_downloader(self):
+        from knowledge_mcp.ingest import fetch_json
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / 'raw.json'
+            with patch('knowledge_mcp.downloads.urlopen', return_value=io.BytesIO(b'{"value": 12}')):
+                self.assertEqual(fetch_json('https://example.org/data', target), {'value': 12})
+            self.assertEqual(target.read_bytes(), b'{"value": 12}')
+
+    def test_failed_unpinned_download_preserves_previous_file(self):
+        from knowledge_mcp.downloads import download_file
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / 'raw.json'
+            target.write_bytes(b'original')
+            with patch('knowledge_mcp.downloads.urlopen', return_value=io.BytesIO(b'oversized')):
+                with self.assertRaises(ValueError): download_file('https://example.org', target, 3)
+            self.assertEqual(target.read_bytes(), b'original')

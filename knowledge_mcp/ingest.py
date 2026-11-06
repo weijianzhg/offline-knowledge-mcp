@@ -7,7 +7,8 @@ import re
 import time
 from contextlib import closing
 from pathlib import Path
-from urllib.request import Request, urlopen
+from .catalog import COLLECTIONS
+from .downloads import download_file
 
 from .store import DEFAULT_DB, connect, initialize, put_document, put_source, utc_now, zim_path
 
@@ -16,16 +17,8 @@ def fetch_json(url, destination):
     # This module is never imported by the serving process.
     for attempt in range(3):
         try:
-            req = Request(url, headers={"User-Agent": "OfflineKnowledgeMCP/0.1 (personal offline data snapshot)",
-                                       "Accept": "application/json"})
-            with urlopen(req, timeout=45) as response:
-                raw = response.read(20_000_001)
-            if len(raw) > 20_000_000:
-                raise ValueError("Response exceeds 20 MB")
-            value = json.loads(raw)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(raw)
-            return value
+            download_file(url, destination, 20_000_000)
+            return json.loads(destination.read_bytes())
         except Exception:
             if attempt == 2:
                 raise
@@ -180,9 +173,9 @@ def main():
     zim.add_argument("--sha256")
     zim.add_argument("--collection", choices=("wikipedia", "wikivoyage", "ifixit", "gutenberg"), default="wikipedia")
     wb = sub.add_parser("sync-world-bank")
-    wb.add_argument("--countries", default="GBR;USA;JPN;CHN;IND;DEU;FRA;CAN;AUS;WLD")
-    wb.add_argument("--first-year", type=int, default=2000)
-    wb.add_argument("--last-year", type=int, default=2025)
+    wb.add_argument("--countries", default=COLLECTIONS["world-bank"]["countries"])
+    wb.add_argument("--first-year", type=int, default=COLLECTIONS["world-bank"]["first_year"])
+    wb.add_argument("--last-year", type=int, default=COLLECTIONS["world-bank"]["last_year"])
     for kind in ("documents", "facts", "csv"):
         cmd = sub.add_parser(kind)
         cmd.add_argument("path", type=Path)

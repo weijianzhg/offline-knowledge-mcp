@@ -1,57 +1,85 @@
-# Import and maintain knowledge
+# Install and maintain knowledge
 
-Run commands from the checkout after [setup](setup.md). In this guide, `python` means `.venv/bin/python` on macOS/Linux or `.\.venv\Scripts\python.exe` on Windows. Substitute that executable; no activation is needed. Add `--db ABSOLUTE_PATH` immediately before each ingest subcommand if using an external database.
+Complete [software setup](setup.md) first. Here `python` means the environment's `.venv/bin/python` on macOS/Linux or `.\.venv\Scripts\python.exe` on Windows; activation is unnecessary.
 
-## Included sample
-
-`examples/` contains synthetic documents, facts and a CSV for onboarding. The values are invented and its example.org citations identify demonstration content. It is not an encyclopedia or statistical snapshot. Keep sample and real data in different databases if you do not want them mixed.
-
-## Wikipedia (Kiwix ZIM)
-
-`source-manifest.json` describes the original starter archive, about 318 MiB, dated 2026-08-20. It is a small English collection, not full Wikipedia. Availability may change. Verify publisher checksums, not just a completed download.
-
-macOS/Linux:
+## One installer for every collection
 
 ```sh
-mkdir -p data/archives data/raw
-curl -fL --retry 2 https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_2026-08.zim -o data/archives/wikipedia_en_100_2026-08.zim
-curl -fL https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_2026-08.zim.meta4 -o data/raw/wikipedia.meta4
-.venv/bin/python -m knowledge_mcp.ingest register-zim data/archives/wikipedia_en_100_2026-08.zim --source-id wikipedia_en_100 --sha256 2eb7fd115bfb8644a08a9482f01f52b507428b1b8a30129fead92f7b6715440b
+python -m knowledge_mcp.collections --list
+python -m knowledge_mcp.collections all
+python -m knowledge_mcp.collections wikipedia world-bank
+python -m knowledge_mcp.collections ifixit wikivoyage gutenberg
 ```
 
-Windows PowerShell:
+Choose `all` or one or more collection names. Duplicate names are installed once. Invalid names, an empty selection, or combining `all` with individual names fail before any download. `--list` only displays the catalog. Add `--db ABSOLUTE_PATH` to use another database; archives and raw API snapshots are kept beside that database.
 
-```powershell
-New-Item -ItemType Directory -Force data/archives, data/raw | Out-Null
-$manifest = Get-Content source-manifest.json -Raw | ConvertFrom-Json
-$archive = Join-Path data/archives $manifest.wikipedia.filename
-Invoke-WebRequest $manifest.wikipedia.url -OutFile $archive
-Invoke-WebRequest $manifest.wikipedia.publisher_metadata_url -OutFile data/raw/wikipedia.meta4
-.\.venv\Scripts\python.exe -m knowledge_mcp.ingest register-zim $archive --source-id $manifest.wikipedia.source_id --sha256 $manifest.wikipedia.sha256
-```
+| Name | Source ID | Coverage | Pinned archive date |
+|---|---|---|---|
+| `wikipedia` | `wikipedia_en_100` | English starter collection, not full Wikipedia | 2026-08-20 |
+| `world-bank` | `world_bank` | Population/GDP; GBR, USA, JPN, CHN, IND, DEU, FRA, CAN, AUS, WLD; 2000–2025 | Download date recorded on installation |
+| `wikivoyage` | `wikivoyage_en` | English travel guide, including pictures | 2026-09-13 |
+| `ifixit` | `ifixit_en` | English repair archive, including illustrations | 2025-12-21 |
+| `gutenberg` | `gutenberg_en_literature` | English general literature, LCC PN; not the entire library | 2026-03-06 |
 
-Registration checks SHA-256 when supplied, the archive's internal checksum, English language and presence of a full-text index. Confirm the hash against the publisher's `.meta4` metadata. If the archive is unavailable, choose an indexed English archive from the [Kiwix catalog](https://download.kiwix.org/zim/wikipedia/) and use its matching publisher checksum. Do not reuse the old hash for another file.
+The four archives total 8,223,768,269 bytes (about 8.22 GB / 7.66 GiB); the World Bank snapshot is small. Archive entry counts include redirects and navigation pages and are not unique book/guide counts. Snapshot dates are not individual article revision dates. Travel listings may change; older literature is historical material.
 
-For larger archives, replace the path/source ID/hash. Registration reads the built-in index without unpacking it; hashing may take time. The archive path is recorded as an absolute local path. Re-register it after moving a database to another machine. Restart running servers after replacing archives, especially on Windows. Use a different source ID to preserve multiple snapshots; use the same ID to replace one.
+## Download, indexing and reuse
 
-Wikipedia text has attribution and share-alike obligations; media licenses vary. See [Wikipedia's copyright guidance](https://en.wikipedia.org/wiki/Wikipedia:Copyrights). Downloaded data is excluded from Git.
+`knowledge_mcp/collection_manifest.json` is the single catalog for names, scope, pinned archive URLs/sizes/publisher SHA-256 hashes and World Bank defaults. It ships with the Python package. It replaces the original root `source-manifest.json`; callers that used that file should use the installer or packaged catalog. Both data types use the same bounded downloader; source-specific adapters handle archive registration or structured statistical import.
 
-## World Bank
+- **Archives:** files are saved under `archives/`. The downloader verifies pinned size and publisher SHA-256 from Kiwix's `.meta4` metadata before accepting a file. Registration also checks internal ZIM integrity, language and a full-text index. Existing valid archives are reused and revalidated without network access. Lexical indexes remain inside the ZIM; no duplicate vector index is built.
+- **World Bank:** downloaded JSON responses are retained under `raw/` with SHA-256 hashes. Facts, definitions and table rows are imported in one database transaction. Existing installed data is reused by default, including a custom country/year selection. Use `python -m knowledge_mcp.collections world-bank --refresh` to replace it with a new download using the catalog defaults. Historical observations may be revised upstream. `--refresh` does not change pinned archive versions.
+- **Selection:** only named collections are installed. Existing unselected collections are retained; selection is not an uninstall operation. Each collection is atomic independently. If a later collection fails, earlier successful installations remain available.
+- **Recovery:** failed downloads remain as `.part` files. Complete, checksum-valid staged archives are reused; incomplete files are downloaded again. Corrupt complete files fail explicitly; move them aside before retrying. Existing accepted files and database records survive failed replacements. Re-run the same selection after resolving a failure.
+
+Source catalogs record attribution, licensing, snapshot dates and archive hashes. Downloads, databases and credentials are excluded from Git. Updating software does not automatically refresh data. If a pinned archive disappears, deliberately update its URL, filename, size and publisher hash together.
+
+## Verify and use
+
+Start the HTTP service with `knowledge-start` on configured Windows installations, or follow [setup](setup.md). Restart after changing server code or replacing open archives.
 
 ```sh
-python -m knowledge_mcp.ingest sync-world-bank
+# Discovery/catalog check for any installed selection
+python -m knowledge_mcp.verify --url http://127.0.0.1:8766/mcp
+
+# Require the original Wikipedia and World Bank collections
+python -m knowledge_mcp.verify --url http://127.0.0.1:8766/mcp --installed-collection
+
+# Require travel, repair and literature search/read/citations
+python -m knowledge_mcp.verify --url http://127.0.0.1:8766/mcp --extra-collections
+```
+
+Omit `--url` to verify a temporary stdio server. Add `--output logs/verification.json` to save a report. Combine `--installed-collection --extra-collections` when all five sources are installed. Pass the same `--db` as the server. A requested collection check fails if that collection is absent; catalog-only verification does not prove retrieval quality. See [testing](testing.md) for the optional real-model diagnostic.
+
+Ask your model to list sources first, then search/read with a specific source ID:
+
+- “Search `wikivoyage_en` for London and read the result. Explain the City of London and cite its snapshot.”
+- “Search `ifixit_en` for battery adhesive strips, read the guide and identify its author and required tools.”
+- “Search `gutenberg_en_literature` for poetry, read a matching book and cite its title and author.”
+
+Unfiltered results interleave independent backend ranks so one archive cannot fill every slot; this is a simple fairness rule, not a global relevance score. Archive hits return `excerpt_offset`; pass it as `read_document.offset` to read near the match. `archive_entry` identifies the original ZIM page. MCP returns **text only**. Open the downloaded ZIM in a [Kiwix reader](https://get.kiwix.org/) to view its original illustrations offline; publisher citation links require internet. A Kiwix reader is separate from this server.
+
+## Advanced imports
+
+The unified installer covers the supported collections. The existing low-level import commands remain available for custom sources and coverage.
+
+For another indexed English archive, verify its publisher checksum and register it explicitly:
+
+```sh
+python -m knowledge_mcp.ingest register-zim /path/to/archive.zim --source-id my_travel --collection wikivoyage --sha256 PUBLISHER_SHA256
+```
+
+The path/hash above are placeholders. Supported archive adapters are `wikipedia` (default), `wikivoyage`, `ifixit` and `gutenberg`. Paths are stored as absolute local paths; re-register after moving an archive. A new source ID retains both snapshots; the same ID replaces its registration.
+
+For a custom World Bank selection:
+
+```sh
 python -m knowledge_mcp.ingest sync-world-bank --countries 'GBR;USA;JPN' --first-year 2000 --last-year 2025
 ```
 
-Use **one** of these commands for your desired scope. A sync replaces the existing World Bank selection; include all countries/years you want to retain. The defaults are in `source-manifest.json`: population and nominal GDP in current US dollars, selected countries/aggregates, 2000–2025. Adjust the end year explicitly when appropriate.
+This explicitly replaces the existing selection; include all countries/years you want to retain. Add `--db ABSOLUTE_PATH` immediately before the ingest subcommand. `lookup_fact` uses ISO3 subjects such as `JPN`, predicates `population` / `gdp_current_usd`, and observation years such as `2024`. Null observations remain null in tables and are omitted from facts. GDP is nominal current US dollars, not real or PPP-adjusted GDP; population is country/aggregate level, not city population.
 
-Downloads and definitions are saved under `raw/` beside the selected database, with SHA-256 hashes in source metadata. All responses are fetched before one import transaction. Download or import failures retain the previous World Bank records. Re-fetching can change historical observations because the publisher revises them. [World Bank API](https://datahelpdesk.worldbank.org/knowledgebase/articles/898581-api-basic-call-structures), [dataset terms](https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets).
-
-`lookup_fact` uses ISO3 subjects such as `JPN`, predicates `population` / `gdp_current_usd`, and observation years such as `2024`. Table filters compare types exactly: World Bank `year` is an integer, while generic CSV values remain strings. Null observations remain null in tables and are omitted from fact lookups. Population is country/aggregate level, not city/metropolitan population; GDP is nominal, not real or PPP-adjusted. Definitions and upstream organizations accompany the facts.
-
-## Your own data
-
-Supply a source JSON containing `id`, `name`, `source_url`, `license`, `scope`, and optionally `snapshot_date` in `YYYY-MM-DD` format. See [the sample](../examples/source.json).
+For your own documents, facts and tables, supply a source JSON with `id`, `name`, `source_url`, `license`, `scope`, and optionally `snapshot_date` (`YYYY-MM-DD`). See `examples/` for synthetic onboarding data; it is not real encyclopedic or statistical evidence.
 
 ```sh
 python -m knowledge_mcp.ingest documents my-documents.jsonl --source my-source.json
@@ -59,51 +87,10 @@ python -m knowledge_mcp.ingest facts my-facts.jsonl --source my-source.json
 python -m knowledge_mcp.ingest csv my-data.csv --source my-source.json --dataset-id my_data
 ```
 
-Document JSONL requires `id`, `title`, `text`, `citation_url`. Fact JSONL requires `id`, `subject`, `predicate`, `value`, `citation_url`; optional keys: `unit`, `observation_date`, `qualifiers`. UTF-8 and UTF-8 with BOM are accepted. CSV headers must be unique simple identifiers. See [examples](../examples/) for complete files.
+Document JSONL needs `id`, `title`, `text`, `citation_url`. Facts need `id`, `subject`, `predicate`, `value`, `citation_url`; optional keys are `unit`, `observation_date`, `qualifiers`. UTF-8 with or without BOM is accepted. CSV headers must be unique simple identifiers. Generic CSV values remain strings; World Bank `year` is an integer. JSONL upserts IDs (omitted old records remain); CSV replaces its dataset.
 
-JSONL imports upsert IDs; omitted records remain. CSV imports replace the dataset. For immutable snapshots, use new source IDs (and dataset IDs for CSV). Back up the database, associated archives and raw snapshots while importers are idle, using SQLite's backup tooling or stopping all processes before copying the database and any WAL files. Git is a source backup, not a knowledge-data backup.
+Back up SQLite using its backup tooling, together with the associated archives and raw snapshots. Git backs up the software, not installed knowledge.
 
-## Offline repair, travel and literature collections
+## Source terms
 
-Install the three pinned English Kiwix archives (about **7.9 GB / 7.35 GiB** total):
-
-```powershell
-.\.venv\Scripts\python.exe -m knowledge_mcp.collections all
-```
-
-On macOS/Linux use `.venv/bin/python` instead. For an external database, add `--db /absolute/path/knowledge.sqlite3` before `all`. To install just one collection, replace `all` with `wikivoyage`, `ifixit`, or `gutenberg`.
-
-| Source ID | Included snapshot | Archive date | Download |
-|---|---|---|---|
-| `wikivoyage_en` | English Wikivoyage, including pictures | 2026-09-13 | 1.07 GB |
-| `ifixit_en` | English iFixit archive, including repair illustrations | 2025-12-21 | 3.57 GB |
-| `gutenberg_en_literature` | Project Gutenberg, LCC PN: Literature (General) | 2026-03-06 | 3.25 GB |
-
-Gutenberg is a **selected subject collection**, not the entire English library. Archives can contain redirects and navigation pages; catalog entry counts are not unique book or guide counts. A snapshot's date does not establish that every page was updated on that date. Travel listings can change; older literature is historical source material.
-
-Downloads go into `archives/` beside the database. The installer checks the pinned publisher file size and SHA-256 from Kiwix's `.meta4` files, then verifies the ZIM internal checksum, English language and full-text index before registering it in SQLite. The built-in lexical indexes are reused directly; no embeddings, model training, database migration or new dependencies are needed. Existing Wikipedia and World Bank sources remain available. Registration is atomic **per collection**; if a later collection fails, earlier successful registrations remain. Re-running reuses verified archives. An interrupted download stays as `.part`; a complete valid staged file is reused, while an incomplete file is downloaded again. A corrupt complete file causes an explicit failure; move it aside before retrying.
-
-Pinned filenames, sizes and hashes live in `knowledge_mcp/collections.py`. The source catalog records publisher links, licensing, snapshot dates and archive hashes. Downloads are excluded from Git. If a pinned archive disappears from Kiwix, deliberately update its filename, size and publisher hash together; do not substitute another archive under the old checksum.
-
-Restart a running HTTP service after updating its code:
-
-```powershell
-knowledge-stop
-knowledge-start
-.\.venv\Scripts\python.exe -m knowledge_mcp.verify --url http://127.0.0.1:8766/mcp --extra-collections --output logs/extra-collections-http.json
-.\.venv\Scripts\python.exe -m knowledge_mcp.verify --extra-collections --output logs/extra-collections-stdio.json
-```
-
-The first probe checks the shared server; the second launches a temporary stdio process. Both require real search matches, correct publisher citations, matching text/hashes and pagination. Local evidence checks block outbound Python sockets. These checks verify MCP retrieval, not a guarantee that every LLM will select or interpret the tools correctly.
-
-Ask your connected model:
-
-- “Search `wikivoyage_en` for London and read the result. Explain the City of London and cite its snapshot.”
-- “Search `ifixit_en` for battery adhesive strips, read the guide and identify the compatible devices and required tools.”
-- “Search `gutenberg_en_literature` for poetry, read a matching book and cite its title and author.”
-
-Use `source_id` to focus searches. Unfiltered results interleave independent backend ranks so the first archive cannot fill every result slot; this is a simple fairness rule, not a global relevance score. Archive hits include `excerpt_offset`, which can be passed as `read_document.offset` to read near the match. `archive_entry` identifies the original page inside the ZIM.
-
-The MCP tools return **text only**. Pictures and formatting remain in the ZIM and can be viewed offline using a [Kiwix reader](https://get.kiwix.org/); the publisher citation links themselves require internet. Read illustrated repair procedures in the original archive when the pictures matter. A Kiwix reader is separate from this MCP installation.
-
-Publisher terms: [Wikivoyage CC BY-SA](https://en.wikivoyage.org/wiki/Wikivoyage:Copyleft), [iFixit CC BY-NC-SA 3.0](https://www.ifixit.com/Info/Licensing), and [Project Gutenberg's per-book and jurisdiction-dependent terms](https://www.gutenberg.org/policy/license.html). Original attribution and notices remain in the archives; this repository does not redistribute their contents.
+Original attribution/notices remain in the archives; this repository does not redistribute their contents. Sources: [Wikipedia](https://en.wikipedia.org/wiki/Wikipedia:Copyrights), [Wikivoyage CC BY-SA](https://en.wikivoyage.org/wiki/Wikivoyage:Copyleft), [iFixit CC BY-NC-SA 3.0](https://www.ifixit.com/Info/Licensing), [Gutenberg per-book/jurisdiction-dependent terms](https://www.gutenberg.org/policy/license.html), and [World Bank terms](https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets).
