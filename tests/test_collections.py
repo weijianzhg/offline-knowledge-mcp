@@ -153,7 +153,7 @@ class UnifiedInstallerTests(unittest.TestCase):
                 result = install_collection('world-bank', db_path)
                 self.assertEqual(result['status'], 'installed')
                 spec = COLLECTIONS['world-bank']
-                sync.assert_called_once_with(db_path, spec['countries'], spec['first_year'], spec['last_year'])
+                sync.assert_called_once_with(db_path.resolve(), spec['countries'], spec['first_year'], spec['last_year'])
             initialize(db_path)
             with closing(connect(db_path, True)) as db, db:
                 put_source(db, {'id': 'world_bank', 'name': 'Custom selection', 'source_url': 'https://data.worldbank.org/', 'license': 'test', 'scope': 'Custom countries'})
