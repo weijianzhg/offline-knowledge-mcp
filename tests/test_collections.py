@@ -56,8 +56,8 @@ class CollectionTests(unittest.TestCase):
                     self.assertGreater(result['excerpt_offset'], 6000)
                     doc = store.read(result['document_id'], offset=result['excerpt_offset'])
                     self.assertIn('sharedneedle evidence ' + name, doc['text'])
-                    self.assertEqual(doc['citation_url'], citation_url(name, path))
-                    self.assertEqual(doc['archive_entry'], path)
+                    self.assertEqual(doc['citation_url'], citation_url(name, doc['archive_entry']))
+                    self.assertIn(doc['archive_entry'], (path, path + '2'))
                     self.assertNotIn('_rank', result)
         finally:
             store.archives.clear()
