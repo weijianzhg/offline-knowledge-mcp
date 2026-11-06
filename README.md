@@ -39,3 +39,29 @@ Retrieved content is evidence, never instructions. No match means `not_in_offlin
 Python 3.12+; pinned dependencies are in `requirements.lock.txt`. Windows x64 and macOS Intel/Apple Silicon are covered by CI, along with Linux x64. See [validation evidence](docs/testing.md) for what has actually been tested.
 
 [Changelog](CHANGELOG.md)
+
+## Short Windows commands
+
+After completing the Windows setup and importing data, run this once from the repository folder in PowerShell:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-WindowsCommands.ps1
+```
+
+Open a new PowerShell window. From any folder, start the background server with:
+
+```powershell
+knowledge-start
+```
+
+Stop it with:
+
+```powershell
+knowledge-stop
+```
+
+The installer creates two command launchers in `%USERPROFILE%\.local\bin` and adds that folder to your user PATH. No administrator rights or desktop shortcuts are needed. Each command allows the bundled PowerShell script to run for that process only; your saved execution policy is unchanged. Organization-enforced policies still apply.
+
+The server uses this checkout's `.venv` and `data/knowledge.sqlite3`, listens at `http://127.0.0.1:8766/mcp`, and writes logs under `logs/`. You can close PowerShell after starting it. Run `knowledge-start` again after reboot; automatic startup is not installed. Starting an already-running instance is safe. Stopping it leaves the data and other applications intact.
+
+If Windows Terminal keeps an old PATH, close all its windows and reopen it. Re-run the installer after moving the checkout, after recreating its virtual environment. To uninstall the commands, delete `knowledge-start.cmd` and `knowledge-stop.cmd` from the installation directory; retain the directory's PATH entry if other commands use it. For a custom command directory, pass `-InstallDirectory 'C:\Your\Bin'`; `-SkipPathUpdate` writes the launchers without changing PATH.

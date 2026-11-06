@@ -70,3 +70,7 @@ Windows users can optionally use `Start-KnowledgeMCP.ps1` and `Stop-KnowledgeMCP
 - ZIM cannot open after moving machines: re-register the local archive; its stored path is machine-specific.
 - On Windows, native libzim/Xapian has limitations reopening non-ASCII archive paths. The server uses an ASCII Windows short-path alias where available. If short names are disabled, move the archive to an ASCII-only path such as `C:\Knowledge\wikipedia.zim` and re-register it. SQLite databases and imported documents do not need this workaround.
 - GUI cannot find Python: set the absolute `.venv/bin/python` or `.venv\Scripts\python.exe` path in the client.
+
+## Short commands for Windows
+
+For everyday background operation, install **knowledge-start** and **knowledge-stop** using the [Windows command instructions](../README.md#short-windows-commands). These use the default database and port. For an external database or a custom port, use the explicit server commands above.
