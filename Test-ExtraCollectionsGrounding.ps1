@@ -12,9 +12,9 @@ $session = Invoke-RestMethod "$WebUI/api/v1/auths/signin" -Method Post -ContentT
 $credential=$null; $signin=$null
 $headers = @{Authorization="Bearer $($session.token)"}
 $checks = @(
-    @{name='wikivoyage'; domain='en.wikivoyage.org'; prompt='Use offline_knowledge_search_knowledge with source_id wikivoyage_en and query London, then read_document on the first result. In 2 sentences explain what the City of London is. Cite the returned URL and archive snapshot date.'},
-    @{name='ifixit'; domain='www.ifixit.com'; prompt='Use offline_knowledge_search_knowledge with source_id ifixit_en and query battery replacement, then read_document on the first result. Report only the guide title, author and listed number of steps. Cite the returned URL and archive snapshot date.'},
-    @{name='gutenberg'; domain='www.gutenberg.org'; prompt='Use offline_knowledge_search_knowledge with source_id gutenberg_en_literature and query poetry, then read_document on the first result. Report the book title and author from the text. Cite the returned URL and archive snapshot date.'}
+    @{name='wikivoyage'; source='wikivoyage_en'; expected=@('City of London','2026-09-13'); domain='en.wikivoyage.org'; prompt='Use offline_knowledge_search_knowledge with source_id wikivoyage_en and query London, then read_document on the first result. In 2 sentences explain what the City of London is. Cite the returned URL and archive snapshot date.'},
+    @{name='ifixit'; source='ifixit_en'; expected=@('iPhone Battery Adhesive Strips','Jeff Suovanen','14','2025-12-21'); domain='www.ifixit.com'; prompt='Use offline_knowledge_search_knowledge with source_id ifixit_en and query battery replacement, then read_document on the first result. Report only the guide title, author and listed number of steps. Cite the returned URL and archive snapshot date.'},
+    @{name='gutenberg'; source='gutenberg_en_literature'; expected=@('Beginnings of Poetry','Gummere','2026-03-06'); domain='www.gutenberg.org'; prompt='Use offline_knowledge_search_knowledge with source_id gutenberg_en_literature and query poetry, then read_document on the first result. Report the book title and author from the text. Cite the returned URL and archive snapshot date.'}
 )
 $report = @()
 try {
@@ -45,6 +45,14 @@ try {
         foreach ($expectedTool in $expectedTools) { if ($expectedTool -notin $calledTools) { throw "Expected tool was not executed: $expectedTool" } }
         if ($reply.content -notmatch 'https://') { throw 'Answer omitted its source URL' }
         if ($reply.content -notmatch [regex]::Escape($check.domain)) { throw 'Answer omitted the expected publisher citation' }
+        foreach ($expected in $check.expected) {
+            if ($reply.content -notmatch [regex]::Escape($expected)) { throw "Answer omitted expected evidence: $expected" }
+        }
+        $calls = @($reply.output | Where-Object { $_.type -eq 'function_call' -and $_.status -eq 'completed' })
+        $searchCalls = @($calls | Where-Object name -eq 'offline_knowledge_search_knowledge' | ForEach-Object { $_.arguments | ConvertFrom-Json })
+        $readCalls = @($calls | Where-Object name -eq 'offline_knowledge_read_document' | ForEach-Object { $_.arguments | ConvertFrom-Json })
+        if ($check.source -notin @($searchCalls.source_id)) { throw 'Search did not select the expected collection' }
+        if (-not @($readCalls | Where-Object { $_.document_id.StartsWith('zim:' + $check.source + ':') }).Count) { throw 'Read did not select the expected collection' }
         Write-Output ($model + ' / ' + $check.name + ': ' + $reply.content)
         Write-Output ('Saved chat: ' + $chat.id)
     }

@@ -200,9 +200,8 @@ class Store:
         if item.size > 10_000_000:
             raise ValueError("Article exceeds the 10 MB extraction limit")
         body = plain_text(bytes(item.content).decode("utf-8", errors="replace"))
-        title_path = path[2:] if path.startswith("A/") else path
         return {"document_id": f"zim:{source['id']}:{quote(path, safe='')}", "title": entry.title,
-                "text": body, "citation_url": citation_url(source.get("collection", "wikipedia"), title_path),
+                "text": body, "citation_url": citation_url(source.get("collection", "wikipedia"), path),
                 "archive_entry": path,
                 "sha256": hashlib.sha256(body.encode()).hexdigest(), "source": evidence_source(source)}
 
@@ -260,7 +259,9 @@ class Store:
             except Exception as exc:
                 errors.append({"source_id": source["id"], "error": type(exc).__name__, "message": str(exc)[:200]})
         # Interleave backend ranks; scores from independent indexes are not comparable.
-        results.sort(key=lambda item: item.pop("_rank"))
+        results.sort(key=lambda item: item["_rank"])
+        for item in results:
+            del item["_rank"]
         return {"status": "found" if results else "source_error" if errors else "not_in_offline_database",
                 "results": results[:limit], "source_errors": errors, "guidance": GROUNDING}
 

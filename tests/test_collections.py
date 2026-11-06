@@ -32,6 +32,9 @@ class CollectionTests(unittest.TestCase):
         archive = self.root / (collection + '.zim')
         with Creator(str(archive)).config_indexing(True, 'eng') as creator:
             creator.add_item(Article())
+            class SecondArticle(Article):
+                def get_path(self): return path + "2"
+            creator.add_item(SecondArticle())
             for key, value in {'Title': collection, 'Description': 'Synthetic test archive', 'Language': 'eng', 'Date': '2026-01-01'}.items():
                 creator.add_metadata(key, value)
         return archive

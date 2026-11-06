@@ -29,3 +29,21 @@ The suite covers provenance, stale/missing evidence, read-only access, parameter
 On an Apple Silicon Mac with CPython 3.12, the sample setup and both real MCP transports were exercised. The original Kiwix archive was downloaded, its publisher SHA-256 and internal checksum verified, and World Bank data imported. Wikipedia search/read and the Japan 2024 population fact/table agreement passed with outbound sockets blocked during local retrieval, then through stdio and localhost HTTP. Reports are kept locally in ignored `logs/`.
 
 Codex CLI registration syntax is checked using isolated configuration, without changing the user's installed MCP registrations. The separate client guides are based on official client documentation. Server transport validation does not imply every model's inference or every UI deployment has been tested. The optional Open WebUI API helpers require their own configured Windows/WebUI environment for an end-to-end chat test.
+
+## Additional collections: local validation, 2026-11-06
+
+On Windows with Python 3.12 x64, downloaded the pinned Wikivoyage, iFixit and Gutenberg LCC PN archives (7,890,338,347 bytes total). Publisher SHA-256, expected file size, ZIM internal integrity and full-text indexes passed. Catalog counts were 68,182, 103,480 and 1,372 archive entries respectively; these include navigation/redirect entries and are not unique-work counts.
+
+All 27 automated tests passed, including synthetic native ZIMs for all four publishers, source-specific citations, late-document offsets, mixed-source result interleaving, download corruption rejection, reinstallation and preservation of existing data after a failed import. Test downloads use fixtures; CI does not download multi-gigabyte collections.
+
+Real stdio and localhost HTTP verification passed for search, read, publisher citations and pagination on all three new collections, plus the original Wikipedia/World Bank checks. Local retrieval was checked with outbound Python socket connections blocked. Reports are saved locally in ignored `logs/collections-stdio.json` and `logs/collections-http.json`.
+
+Open WebUI with `qwen3.8:27b` completed three real chats through the shared MCP tool. Each selected the intended source, executed search and read, and cited the publisher and archive date. Answers identified the City of London; the iPhone Battery Adhesive Strips guide, Jeff Suovanen and 14 steps; and The Beginnings of Poetry by Francis B. Gummere. This is a focused smoke test of one model, not a broad accuracy benchmark.
+
+To repeat the model check on a configured Windows/Open WebUI installation:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-ExtraCollectionsGrounding.ps1 -Model YOUR_MODEL_ID -CredentialFile 'C:\path\to\webui-credential.xml'
+```
+
+This optional diagnostic uses an existing DPAPI credential and the shared tool selection, creates three test chats, runs inference, and saves `logs/extra-collections-grounding.json`. It requires the pinned snapshots; expected answer details can change when those snapshots change. It does not change WebUI tool registrations or model defaults.
