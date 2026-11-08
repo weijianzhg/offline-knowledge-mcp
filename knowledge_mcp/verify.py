@@ -14,7 +14,7 @@ from .store import DEFAULT_DB, Store, utc_now
 TOOLS = {"list_sources", "search_knowledge", "read_document", "lookup_fact", "query_data"}
 
 
-async def verify(db_path, url=None, query=None, installed_collection=False, extra_collections=False):
+async def verify(db_path, url=None, query=None, installed_collection=False, extra_collections=False, history_collections=False):
     store = Store(db_path)
     # Event loop creation happens before this patch (Windows uses a socket pair).
     with patch.object(socket.socket, "connect", side_effect=AssertionError("Outbound network forbidden")):
@@ -39,13 +39,19 @@ async def verify(db_path, url=None, query=None, installed_collection=False, extr
                 raise RuntimeError("World Bank fact/table mismatch")
 
     collection_checks = []
+    checks = []
     if extra_collections:
+        checks.extend([
+            ("wikivoyage_en", "London", "https://en.wikivoyage.org/wiki/"),
+            ("ifixit_en", "battery replacement", "https://www.ifixit.com/"),
+            ("gutenberg_en_literature", "poetry", "https://www.gutenberg.org/ebooks/"),
+        ])
+    if history_collections:
+        checks.extend(("gutenberg_en_history_" + code, query, "https://www.gutenberg.org/ebooks/")
+                      for code, query in [("d", "Rome"), ("e", "Lincoln"), ("f", "Canada")])
+    if checks:
         with patch.object(socket.socket, "connect", side_effect=AssertionError("Outbound network forbidden")):
-            for source_id, collection_query, prefix in [
-                ("wikivoyage_en", "London", "https://en.wikivoyage.org/wiki/"),
-                ("ifixit_en", "battery replacement", "https://www.ifixit.com/"),
-                ("gutenberg_en_literature", "poetry", "https://www.gutenberg.org/ebooks/"),
-            ]:
+            for source_id, collection_query, prefix in checks:
                 hits = store.search(collection_query, source_id=source_id)
                 if hits["source_errors"] or not hits["results"]:
                     raise RuntimeError(f"Collection search failed: {source_id}")
@@ -124,12 +130,13 @@ def main():
     parser.add_argument("--query", help="Require a matching local document and verify it over MCP")
     parser.add_argument("--installed-collection", action="store_true", help="Also require the starter Wikipedia and World Bank sources")
     parser.add_argument("--extra-collections", action="store_true", help="Require Wikivoyage, iFixit and Gutenberg search/read/citations")
+    parser.add_argument("--history-collections", action="store_true", help="Require all three Gutenberg history archives and verify search/read/citations")
     parser.add_argument("--output", type=Path, help="Optional JSON report path")
     args = parser.parse_args()
     db_path = args.db.expanduser().resolve()
     if not db_path.is_file():
         parser.error("Database missing; initialize and import data first")
-    report = asyncio.run(verify(db_path, args.url, args.query, args.installed_collection, args.extra_collections))
+    report = asyncio.run(verify(db_path, args.url, args.query, args.installed_collection, args.extra_collections, args.history_collections))
     serialized = json.dumps(report, indent=2)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

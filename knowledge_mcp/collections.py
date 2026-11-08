@@ -28,7 +28,7 @@ def install_collection(name, db_path=DEFAULT_DB, *, refresh=False):
         raise ValueError("Unsupported collection kind: " + spec["kind"])
     target = db_path.parent / "archives" / spec["filename"]
     archive = download_file(spec["url"], target, spec["size"], size=spec["size"], sha256=spec["sha256"])
-    source = register_zim(db_path, archive, spec["source_id"], spec["sha256"], collection=name)
+    source = register_zim(db_path, archive, spec["source_id"], spec["sha256"], collection=spec.get("adapter", name))
     return {"status": "installed", "collection": name, "source": source}
 
 
