@@ -83,6 +83,29 @@ class CollectionTests(unittest.TestCase):
             self.assertEqual(register.call_count, 2)
             self.assertEqual((self.root / 'archives/fixture.zim').read_bytes(), data)
 
+    def test_named_history_collection_reuses_gutenberg_adapter(self):
+        from knowledge_mcp.catalog import COLLECTIONS
+        archive = self.make_archive('history-world', 'History of Rome.123')
+        spec = {**COLLECTIONS['history-world'], 'filename': archive.name,
+                'size': archive.stat().st_size,
+                'sha256': hashlib.sha256(archive.read_bytes()).hexdigest()}
+        with patch('knowledge_mcp.collections.COLLECTIONS', {'history-world': spec}), \
+             patch('knowledge_mcp.downloads.urlopen', return_value=io.BytesIO(archive.read_bytes())):
+            installed = install_collection('history-world', self.db)
+        self.assertEqual(installed['source']['collection'], 'gutenberg')
+        self.assertIn('/zim/gutenberg/', installed['source']['source_url'])
+        store = Store(self.db)
+        try:
+            with patch.object(socket.socket, 'connect', side_effect=AssertionError('Network forbidden')):
+                result = store.search('sharedneedle', source_id=spec['source_id'])
+                self.assertFalse(result['source_errors'])
+                self.assertTrue(result['results'])
+                doc = store.read(result['results'][0]['document_id'])
+                self.assertTrue(doc['citation_url'].startswith('https://www.gutenberg.org/ebooks/'))
+                self.assertEqual(doc['source']['id'], spec['source_id'])
+        finally:
+            store.archives.clear()
+
     def test_bad_download_never_registers(self):
         for data in [b'bad', b'wrong!', b'too long for expected']:
             with self.subTest(data=data), \

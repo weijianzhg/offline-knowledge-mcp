@@ -18,7 +18,7 @@ Retrieval reads local files only. Downloads and imports are separate, explicit o
 
 ## Install knowledge collections
 
-All five collections use the same installer. From the repository folder in Windows PowerShell:
+All eight collections use the same installer. From the repository folder in Windows PowerShell:
 
 ```powershell
 # See the available collections and download sizes
@@ -41,8 +41,19 @@ On macOS/Linux, replace `.\.venv\Scripts\python.exe` with `.venv/bin/python`. Ch
 | `wikivoyage` | English travel guides with pictures | 1.07 GB |
 | `ifixit` | English repair guides with illustrations | 3.57 GB |
 | `gutenberg` | English general literature, LCC PN selection | 3.25 GB |
+| `history-world` | Classic world history, Gutenberg LCC D | 40.25 GB |
+| `history-america` | American/United States history, Gutenberg LCC E | 10.20 GB |
+| `history-americas-regional` | Regional history of the Americas, Gutenberg LCC F | 9.89 GB |
 
-Installing everything requires about **8.22 GB** of archives plus the small statistical dataset. Wikipedia and Gutenberg are selected collections, not their full English libraries. The installer downloads, validates and registers the chosen data for lexical search. It reuses verified archives and preserves an existing World Bank snapshot. No embeddings or model training are involved.
+Installing everything requires about **68.56 GB** of archives plus the small statistical dataset. Wikipedia and Gutenberg are selected collections, not their full English libraries. The installer downloads, validates and registers the chosen data for lexical search. It reuses verified archives and preserves an existing World Bank snapshot. No embeddings or model training are involved.
+
+To add just the history books (60.34 GB / 56.20 GiB):
+
+```powershell
+.\.venv\Scripts\python.exe -m knowledge_mcp.collections history-world history-america history-americas-regional
+```
+
+These are English-language classic works and historical sources, not a current history textbook. Their interpretations and terminology reflect their authors' periods. The three archives may overlap in titles. Use source-filtered search when asking about a particular region.
 
 To explicitly refresh World Bank using the catalog's country/year selection:
 

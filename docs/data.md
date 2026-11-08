@@ -20,12 +20,15 @@ Choose `all` or one or more collection names. Duplicate names are installed once
 | `wikivoyage` | `wikivoyage_en` | English travel guide, including pictures | 2026-09-13 |
 | `ifixit` | `ifixit_en` | English repair archive, including illustrations | 2025-12-21 |
 | `gutenberg` | `gutenberg_en_literature` | English general literature, LCC PN; not the entire library | 2026-03-06 |
+| `history-world` | `gutenberg_en_history_d` | World history, LCC D | December 2025 archive |
+| `history-america` | `gutenberg_en_history_e` | American/United States history, LCC E | March 2026 archive |
+| `history-americas-regional` | `gutenberg_en_history_f` | Regional history of the Americas, LCC F | March 2026 archive |
 
-The four archives total 8,223,768,269 bytes (about 8.22 GB / 7.66 GiB); the World Bank snapshot is small. Archive entry counts include redirects and navigation pages and are not unique book/guide counts. Snapshot dates are not individual article revision dates. Travel listings may change; older literature is historical material.
+The seven archives total 68,563,168,942 bytes (about 68.56 GB / 63.85 GiB); the World Bank snapshot is small. Archive entry counts include redirects and navigation pages and are not unique book/guide counts. Snapshot dates are not individual article revision dates. Travel listings may change; older literature is historical material.
 
 ## Download, indexing and reuse
 
-`knowledge_mcp/collection_manifest.json` is the single catalog for names, scope, pinned archive URLs/sizes/publisher SHA-256 hashes and World Bank defaults. It ships with the Python package. It replaces the original root `source-manifest.json`; callers that used that file should use the installer or packaged catalog. Both data types use the same bounded downloader; source-specific adapters handle archive registration or structured statistical import.
+`knowledge_mcp/collection_manifest.json` is the single catalog for names, scope, pinned archive URLs/sizes/publisher SHA-256 hashes and World Bank defaults. It ships with the Python package. An optional `adapter` field lets multiple collections reuse the same publisher adapter; all history archives use `gutenberg` for attribution and ebook citations. It replaces the original root `source-manifest.json`; callers that used that file should use the installer or packaged catalog. Both data types use the same bounded downloader; source-specific adapters handle archive registration or structured statistical import.
 
 - **Archives:** files are saved under `archives/`. The downloader verifies pinned size and publisher SHA-256 from Kiwix's `.meta4` metadata before accepting a file. Registration also checks internal ZIM integrity, language and a full-text index. Existing valid archives are reused and revalidated without network access. Lexical indexes remain inside the ZIM; no duplicate vector index is built.
 - **World Bank:** downloaded JSON responses are retained under `raw/` with SHA-256 hashes. Facts, definitions and table rows are imported in one database transaction. Existing installed data is reused by default, including a custom country/year selection. Use `python -m knowledge_mcp.collections world-bank --refresh` to replace it with a new download using the catalog defaults. Historical observations may be revised upstream. `--refresh` does not change pinned archive versions.
@@ -94,3 +97,9 @@ Back up SQLite using its backup tooling, together with the associated archives a
 ## Source terms
 
 Original attribution/notices remain in the archives; this repository does not redistribute their contents. Sources: [Wikipedia](https://en.wikipedia.org/wiki/Wikipedia:Copyrights), [Wikivoyage CC BY-SA](https://en.wikivoyage.org/wiki/Wikivoyage:Copyleft), [iFixit CC BY-NC-SA 3.0](https://www.ifixit.com/Info/Licensing), [Gutenberg per-book/jurisdiction-dependent terms](https://www.gutenberg.org/policy/license.html), and [World Bank terms](https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets).
+
+## History books
+
+Install `history-world history-america history-americas-regional` to add the three English Gutenberg history archives (60.34 GB / 56.20 GiB). This is a collection of classic works, including historical perspectives and terminology, not a modern consensus reference. Titles may appear in more than one classification. The existing `gutenberg` general-literature selection is retained.
+
+Search with source IDs `gutenberg_en_history_d`, `gutenberg_en_history_e`, or `gutenberg_en_history_f`, then read the returned document near `excerpt_offset`. Citations link to the original Gutenberg ebook. Run `python -m knowledge_mcp.verify --history-collections` for local and stdio history checks; add `--url http://127.0.0.1:8766/mcp` to verify the shared service.

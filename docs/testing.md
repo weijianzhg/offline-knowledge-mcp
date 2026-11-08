@@ -49,3 +49,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-ExtraCollectionsG
 This optional diagnostic uses an existing DPAPI credential and the shared tool selection, creates three test chats, runs inference, and saves `logs/extra-collections-grounding.json`. It requires the pinned snapshots; expected answer details can change when those snapshots change. It does not change WebUI tool registrations or model defaults.
 
 The unified installer refactor additionally verifies selection validation/deduplication, list-only behavior, World Bank first install/reuse/explicit refresh, incomplete-registration recovery, and shared downloader failure preservation. A built wheel was imported outside the checkout to confirm the five-collection catalog is packaged correctly. Installing all five already-present collections was exercised with outbound sockets blocked.
+
+## History collection checks
+
+`python -m knowledge_mcp.verify --history-collections` requires the three history sources and checks source-filtered Rome, Lincoln and Canada searches, Gutenberg citations, matching document content over MCP, and pagination. Add `--url http://127.0.0.1:8766/mcp` to test the shared HTTP server instead of temporary stdio. Local retrieval runs with outbound sockets blocked. The synthetic regression suite also verifies that a named history collection uses the existing Gutenberg adapter rather than inventing a new citation format.

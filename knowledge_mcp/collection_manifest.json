@@ -46,5 +46,38 @@
     "sha256": "1e1bd1fdf7464fb31f026e7a02e2bfbc77427802a2cbd7acb7402c09a046be19",
     "url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim",
     "publisher_metadata_url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim.meta4"
+  },
+  "history-world": {
+    "kind": "zim",
+    "adapter": "gutenberg",
+    "description": "World history (Gutenberg LCC D)",
+    "filename": "gutenberg_en_lcc-d_2025-12.zim",
+    "source_id": "gutenberg_en_history_d",
+    "size": 40254449517,
+    "sha256": "d927fc8e711ce139b82dcf4b67887edf7a6db38cad4fbf890bcf7b1d9638d270",
+    "url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-d_2025-12.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-d_2025-12.zim.meta4"
+  },
+  "history-america": {
+    "kind": "zim",
+    "adapter": "gutenberg",
+    "description": "American and United States history (Gutenberg LCC E)",
+    "filename": "gutenberg_en_lcc-e_2026-03.zim",
+    "source_id": "gutenberg_en_history_e",
+    "size": 10196817986,
+    "sha256": "890ce01ca4d72000f1209a4a327d45d1f6530e2e48860dc9873bd53da3d463fe",
+    "url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-e_2026-03.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-e_2026-03.zim.meta4"
+  },
+  "history-americas-regional": {
+    "kind": "zim",
+    "adapter": "gutenberg",
+    "description": "Regional history of the Americas (Gutenberg LCC F)",
+    "filename": "gutenberg_en_lcc-f_2026-03.zim",
+    "source_id": "gutenberg_en_history_f",
+    "size": 9888133170,
+    "sha256": "291161ebf0f1229d7348049603f517e0d423fb0725a63b91e44d5dfed77f486c",
+    "url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-f_2026-03.zim",
+    "publisher_metadata_url": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-f_2026-03.zim.meta4"
   }
 }
